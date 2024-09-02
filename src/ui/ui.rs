@@ -1,10 +1,13 @@
 
 
 use std::{io, time::Duration, error::Error};
+use crate::backend::components::get_process_list::get_process_list;
+
 use super::backend::process::process::Process;
-use super::main::ui;
+use super::rendering::ui;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::prelude::{Backend, CrosstermBackend};
+use ratatui::widgets::ListState;
 use ratatui::{Frame, Terminal};
 use ratatui::crossterm::event::EnableMouseCapture;
 use ratatui::crossterm::execute;
@@ -16,7 +19,7 @@ use ratatui::crossterm::terminal::{disable_raw_mode, LeaveAlternateScreen};
 pub enum CurrentScreen {
     #[default]
     Main,
-    Editing,
+    SelectingProcess,
     Exiting,
 }
 
@@ -25,20 +28,25 @@ pub enum CurrentlyEditing {
     Value,
 }
 
+
 #[derive(Debug, Default)]
 pub struct App {
     pub open_process: Option<Process>,
     pub current_screen: CurrentScreen,
+    pub list_state: ListState, // i really wish i didnt have to put this here lmfao
     pub exit: bool,
 }
 
 impl App {
     pub fn new() -> App {
-        App {
+        let mut app = App {
             open_process: None,
             current_screen: CurrentScreen::Main,
+            list_state: ListState::default(),
             exit: false
-        }
+        };
+        app.list_state.select(Some(0)); // set a default value so the list renders properly
+        app
     }
 
     fn render_frame(&self, frame: &mut Frame) {
@@ -101,14 +109,36 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                     KeyCode::Char('q') => {
                         app.current_screen = CurrentScreen::Exiting;
                     }
+                    KeyCode::Char('p') => {
+                        app.current_screen = CurrentScreen::SelectingProcess;
+                    }
                     _ => {}
                 },
                 CurrentScreen::Exiting => match key.code {
-                    KeyCode::Char('y') => {
+                    KeyCode::Char('y') | KeyCode::Char('q') => {
                         return Ok(true);
                     }
-                    KeyCode::Char('n') | KeyCode::Char('q') => {
-                        return Ok(false);
+                    KeyCode::Char('c') => {
+                        app.current_screen = CurrentScreen::Main;
+                    }
+                    _ => {}
+                }
+                CurrentScreen::SelectingProcess => match key.code {
+                    KeyCode::Char('q') => {
+                        app.current_screen = CurrentScreen::Main;
+                    }
+                    KeyCode::Char('j') | KeyCode::Up => {
+                        app.list_state.select_previous()
+                    }
+                    KeyCode::Char('k') | KeyCode::Down => {
+                        app.list_state.select_next()
+                    }
+                    KeyCode::Char('c') => {
+                        let processes = get_process_list();
+                        let Some(idx) = app.list_state.selected()
+                        else { continue; };
+                        app.open_process = Process::open(processes[idx].1).ok();
+                        app.current_screen = CurrentScreen::Main;
                     }
                     _ => {}
                 }
