@@ -6,7 +6,7 @@ use ratatui::{
     Frame,
 };
 
-use super::ui::{App, CurrentScreen, CurrentlyEditing};
+use super::{components::mem_view_window::mem_view_window, ui::{App, CurrentScreen, CurrentlyEditing}};
 use super::components::{
     titlebar::titlebar, 
     keybind_lowbar::keybind_lowbar,
@@ -27,6 +27,30 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
  
     frame.render_widget(titlebar(&app), chunks[0]);
 
+    let main_body = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(50),
+            Constraint::Percentage(50),
+        ])
+        .split(chunks[1]);
+
+    let mem_view_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Min(3),
+            Constraint::Length(1),
+        ])
+        .vertical_margin(1)
+        .horizontal_margin(1)
+        .split(main_body[0]);
+
+    let mvb = Block::bordered().title(format!("Found: {}", app.mem_view_list.list.len())).title_alignment(ratatui::layout::Alignment::Left).bg(Color::from_u32(0x00252525));
+    let mvba = Rect { x: main_body[0].x, y: main_body[0].y, width: main_body[0].width, height: main_body[0].height };
+    frame.render_widget(mvb, mvba);
+    mem_view_window(mem_view_chunks[0], frame, mem_view_chunks, app);
+
 
     let key_notes_footer =
        keybind_lowbar();
@@ -41,7 +65,7 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
     match app.current_screen {
         CurrentScreen::Exiting => {
             let outer_block = Block::bordered().title("Exit CERS").title_alignment(ratatui::layout::Alignment::Center).bg(Color::from_u32(0x00121111));
-            let outer_area = centered_rect(40, 40, frame.area());
+            let outer_area = centered_rect(32, 30, frame.area());
             let area = centered_rect(30, 15, frame.area());
             let exit_chunks = Layout::default()
                 .direction(Direction::Vertical)
@@ -66,7 +90,7 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
                 ])
                 .split(area);
             frame.render_widget(outer_block, outer_area);
-            process_select(area, frame, popup_chunks, &mut app.list_state);
+            process_select(area, frame, popup_chunks, app);
             }
         _ => {
 

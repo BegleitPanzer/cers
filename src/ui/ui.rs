@@ -7,7 +7,7 @@ use super::backend::process::process::Process;
 use super::rendering::ui;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::prelude::{Backend, CrosstermBackend};
-use ratatui::widgets::ListState;
+use ratatui::widgets::{List, ListState};
 use ratatui::{Frame, Terminal};
 use ratatui::crossterm::event::EnableMouseCapture;
 use ratatui::crossterm::execute;
@@ -28,12 +28,30 @@ pub enum CurrentlyEditing {
     Value,
 }
 
+#[derive(Debug, Default)]
+pub struct VList {
+    pub list: List<'static>,
+    pub state: ListState,
+}
+
+impl VList {
+    fn new() -> Self {
+        let state = ListState::default();
+        let list = List::default();
+        VList { list, state }
+    }
+}
+
+
+
 
 #[derive(Debug, Default)]
 pub struct App {
     pub open_process: Option<Process>,
     pub current_screen: CurrentScreen,
-    pub list_state: ListState, // i really wish i didnt have to put this here lmfao
+    pub proc_list: VList, // i really wish i didnt have to put this here lmfao
+    pub mem_view_list: VList,
+    pub query: String,
     pub exit: bool,
 }
 
@@ -42,10 +60,13 @@ impl App {
         let mut app = App {
             open_process: None,
             current_screen: CurrentScreen::Main,
-            list_state: ListState::default(),
+            proc_list: VList::new(),
+            mem_view_list: VList::new(),
+            query: String::new(),
             exit: false
         };
-        app.list_state.select(Some(0)); // set a default value so the list renders properly
+        app.proc_list.state.select(Some(0)); // set a default value so the list renders properly
+        app.mem_view_list.state.select(Some(0));
         app
     }
 
@@ -112,6 +133,12 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                     KeyCode::Char('p') => {
                         app.current_screen = CurrentScreen::SelectingProcess;
                     }
+                    KeyCode::Char('j') | KeyCode::Up => {
+                        app.mem_view_list.state.select_previous()
+                    }
+                    KeyCode::Char('k') | KeyCode::Down => {
+                        app.mem_view_list.state.select_next()
+                    }
                     _ => {}
                 },
                 CurrentScreen::Exiting => match key.code {
@@ -128,14 +155,14 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                         app.current_screen = CurrentScreen::Main;
                     }
                     KeyCode::Char('j') | KeyCode::Up => {
-                        app.list_state.select_previous()
+                        app.proc_list.state.select_previous()
                     }
                     KeyCode::Char('k') | KeyCode::Down => {
-                        app.list_state.select_next()
+                        app.proc_list.state.select_next()
                     }
                     KeyCode::Char('c') => {
                         let processes = get_process_list();
-                        let Some(idx) = app.list_state.selected()
+                        let Some(idx) = app.proc_list.state.selected()
                         else { continue; };
                         app.open_process = Process::open(processes[idx].1).ok();
                         app.current_screen = CurrentScreen::Main;
