@@ -24,7 +24,7 @@ pub fn mem_view_window(area: Rect, frame: &mut Frame, chunks: Rc<[Rect]>, app: &
         spaces.into(),
         process_id.into(),
     ];
-    let title = Line::from(title_lines).bg(Color::from_u32(0x00212121));
+    let title = Line::from(title_lines).bg(Color::from_u32(0x00151414));
     frame.render_widget(title, chunks[0]);
 
     let query = &app.query;
@@ -54,7 +54,7 @@ pub fn mem_view_window(area: Rect, frame: &mut Frame, chunks: Rc<[Rect]>, app: &
     let list = List::new(processes_styled)
         .direction(ListDirection::TopToBottom)
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
-        .highlight_symbol(" >> ").bg(Color::from_u32(0x00252525))
+        .highlight_symbol(" >> ").bg(Color::from_u32(0x00151414))
         .repeat_highlight_symbol(false);
     app.mem_view_list.list = list.clone();
     frame.render_stateful_widget(list, chunks[1], &mut app.mem_view_list.state);
@@ -63,7 +63,7 @@ pub fn mem_view_window(area: Rect, frame: &mut Frame, chunks: Rc<[Rect]>, app: &
 
     let lines: Vec<Span<'_>> = vec![
         "[m]: Modify Value".dark_gray(),
-        "  |  ".fg(Color::from_u32(0x00242222)),
+        "  |  ".fg(Color::from_u32(0x00151414)),
         "[c]: Copy Address".dark_gray(),
     ];
     let bar = Line::from(lines).centered().bg(Color::from_u32(0x00212121));

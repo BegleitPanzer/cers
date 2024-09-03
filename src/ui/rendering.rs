@@ -1,9 +1,5 @@
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Style, Stylize},
-    text::{Line, Span, Text},
-    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap},
-    Frame,
+    buffer::Buffer, layout::{Constraint, Direction, Layout, Rect}, style::{Color, Style, Stylize}, text::{Line, Span, Text}, widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Widget, Wrap}, Frame
 };
 
 use super::{components::mem_view_window::mem_view_window, ui::{App, CurrentScreen, CurrentlyEditing}};
@@ -46,7 +42,10 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
         .horizontal_margin(1)
         .split(main_body[0]);
 
-    let mvb = Block::bordered().title(format!("Found: {}", app.mem_view_list.list.len())).title_alignment(ratatui::layout::Alignment::Left).bg(Color::from_u32(0x00252525));
+    let mvb = Block::bordered()
+        .title(format!(" Found: {} ", app.mem_view_list.list.len()))
+        .title_alignment(ratatui::layout::Alignment::Center)
+        .bg(Color::from_u32(0x00151414));
     let mvba = Rect { x: main_body[0].x, y: main_body[0].y, width: main_body[0].width, height: main_body[0].height };
     frame.render_widget(mvb, mvba);
     mem_view_window(mem_view_chunks[0], frame, mem_view_chunks, app);
@@ -64,8 +63,9 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
 
     match app.current_screen {
         CurrentScreen::Exiting => {
-            let outer_block = Block::bordered().title("Exit CERS").title_alignment(ratatui::layout::Alignment::Center).bg(Color::from_u32(0x00121111));
-            let outer_area = centered_rect(32, 30, frame.area());
+            let outer_block = Block::bordered().title(" Exit CERS ").title_alignment(ratatui::layout::Alignment::Center).bg(Color::from_u32(0x00121111));
+            let outer_area = centered_rect(32, 40, frame.area());
+            frame.render_widget(Clear, outer_area); // clears the area for this box so that the border doesn't show through
             let area = centered_rect(30, 15, frame.area());
             let exit_chunks = Layout::default()
                 .direction(Direction::Vertical)
@@ -78,9 +78,11 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
             exit(frame, exit_chunks);
         }
         CurrentScreen::SelectingProcess => {
-            let outer_block = Block::bordered().title("Process Selection").title_alignment(ratatui::layout::Alignment::Center).bg(Color::from_u32(0x00121111));
+            
+            let outer_block = Block::bordered().title(" Process Selection ").title_alignment(ratatui::layout::Alignment::Center).bg(Color::from_u32(0x00121111));
             let outer_area = centered_rect(62, 64, frame.area());
             let area = centered_rect(60, 60, frame.area());
+            frame.render_widget(Clear, outer_area); // clears the area for this box so that the border doesn't show through
             let popup_chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
