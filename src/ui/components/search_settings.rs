@@ -12,8 +12,8 @@ pub fn search_settings(area: Rect, frame: &mut Frame, chunks: &Rc<[Rect]>, app: 
     
     let input = Paragraph::new(app.query.1.as_str())
             .style(match app.input_mode {
-                InputMode::Normal => Style::default(),
-                InputMode::Editing => Style::default().fg(Color::Yellow),
+                InputMode::EditingQuery => Style::default().fg(Color::Yellow),
+                _ => Style::default(),
             })
             .block(Block::bordered().title("Search Query"))
             .bg(Color::from_u32(0x00151414));

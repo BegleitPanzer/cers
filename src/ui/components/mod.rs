@@ -4,4 +4,5 @@ pub mod process_select;
 pub mod exit;
 pub mod mem_view_window;
 pub mod search_settings;
+pub mod addr_bounds;
 use super::utils;

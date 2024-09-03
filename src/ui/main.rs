@@ -31,7 +31,9 @@ pub enum CurrentScreen {
 pub enum InputMode {
     #[default]
     Normal,
-    Editing,
+    EditingQuery,
+    EditingUpperBound,
+    EditingLowerBound,
 }
 
 #[derive(Debug, Default)]
@@ -76,9 +78,11 @@ pub struct App {
     pub proc_list: VList, // i really wish i didnt have to put this here lmfao
     pub mem_view_list: VList,
     pub query: (i32, String), // i32 is the index of the character, necessary for cursor positioning
+    pub bounds: ((i32, String), (i32, String)), // upper and lower bounds for memory scanning, respectively
+    pub query_results: Vec<(String, String)>,
     pub input_mode: InputMode,
     pub scan_type: ScanTypes,
-    pub exit: bool,
+
 }
 
 impl App {
@@ -89,30 +93,16 @@ impl App {
             proc_list: VList::new(),
             mem_view_list: VList::new(),
             query: (0, String::new()),
+            bounds: ((16, String::from("0000000000000000")), (16, String::from("00007fffffffffff"))),
             input_mode: InputMode::Normal,
+            query_results: Vec::new(),
             scan_type: ScanTypes::Exact,
-            exit: false
         };
         app.proc_list.state.select(Some(0)); // set a default value so the list renders properly
         app.mem_view_list.state.select(Some(0));
         app
     }
 
-    fn render_frame(&self, frame: &mut Frame) {
-        todo!()
-    }
-
-    fn run_query(&mut self) {
-        todo!()
-    }
-
-    fn handle_events(&mut self) -> io::Result<()> {
-        let timeout = Duration::from_secs_f64(1.0 / 50.0);
-        if !event::poll(timeout)? {
-            return Ok(());
-        }
-        Ok(())
-    }
 }
 
 pub fn main() -> Result<(), Box<dyn Error>> {
@@ -153,20 +143,22 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
             match app.input_mode {
                 InputMode::Normal => match key.code {
                     KeyCode::Char('s') => {
-                        if app.current_screen != CurrentScreen::Main {
-                            app.current_screen = CurrentScreen::Main;
-                        }
-                        app.input_mode = InputMode::Editing;
+                        if app.current_screen != CurrentScreen::Main { continue };
+                        app.input_mode = InputMode::EditingQuery;
                     }
                     KeyCode::Char('t') => {
                         continue;
                     }
+                    KeyCode::Char('b') => {
+                        if app.current_screen != CurrentScreen::Main { continue };
+                        app.input_mode = InputMode::EditingLowerBound;
+                    }
                     _ => {}
                 },
-                InputMode::Editing if key.kind == KeyEventKind::Press => match key.code {
+                InputMode::EditingQuery if key.kind == KeyEventKind::Press => match key.code {
                     KeyCode::Enter => {
                         app.input_mode = InputMode::Normal;
-                        get_mem_from_query(app.query.1.clone())
+                        get_mem_from_query(app);
                     },
                     KeyCode::Char(to_insert) => {
                         app.query = (app.query.0 + 1, format!("{}{}", app.query.1, to_insert));
@@ -178,18 +170,50 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                     KeyCode::Esc => app.input_mode = InputMode::Normal,
                     _ => {}
                 },
-                InputMode::Editing => {}
+                InputMode::EditingUpperBound | InputMode::EditingLowerBound if key.kind == KeyEventKind::Press => match key.code {
+                    KeyCode::Enter | KeyCode::Esc => {
+                        app.input_mode = InputMode::Normal;
+                    },
+                    KeyCode::Char(to_insert) => {
+                        if let InputMode::EditingLowerBound = app.input_mode {
+                            app.bounds.0 = (app.bounds.0.0 + 1, format!("{}{}", app.bounds.0.1, to_insert));
+                        } else {
+                            app.bounds.1 = (app.bounds.1.0 + 1, format!("{}{}", app.bounds.1.1, to_insert));
+                        }
+                    },
+                    KeyCode::Backspace => {
+                        if let InputMode::EditingLowerBound = app.input_mode {
+                            app.bounds.0 = ((app.bounds.0.0 - 1).clamp(0, std::i32::MAX), app.bounds.0.1[..app.bounds.0.1.len().saturating_sub(1)].to_string());
+                        } else {
+                            app.bounds.1 = ((app.bounds.1.0 - 1).clamp(0, std::i32::MAX), app.bounds.1.1[..app.bounds.1.1.len().saturating_sub(1)].to_string());
+                        }
+                    },
+                    KeyCode::Tab => { 
+                        match app.input_mode {
+                        InputMode::EditingUpperBound => app.input_mode = InputMode::EditingLowerBound,
+                        InputMode::EditingLowerBound => app.input_mode = InputMode::EditingUpperBound,
+                        _ => {}
+                        }
+                    },
+                    _ => {}
+                },
+                InputMode::EditingQuery | InputMode::EditingLowerBound | InputMode::EditingUpperBound => {}
             }
-
 
             match app.current_screen {
                 CurrentScreen::Main => match key.code {
                     KeyCode::Char('q') => {
-                        if app.input_mode == InputMode::Editing { continue; } // editing should ALWAYS take input priority
+                        if app.input_mode == InputMode::EditingQuery 
+                        || app.input_mode == InputMode::EditingLowerBound
+                        || app.input_mode == InputMode::EditingUpperBound 
+                        { continue; } // editing should ALWAYS take input priority
                         app.current_screen = CurrentScreen::Exiting;
                     }
                     KeyCode::Char('p') => {
-                        if app.input_mode == InputMode::Editing { continue; }
+                        if app.input_mode == InputMode::EditingQuery 
+                        || app.input_mode == InputMode::EditingLowerBound
+                        || app.input_mode == InputMode::EditingUpperBound 
+                        { continue; }
                         app.current_screen = CurrentScreen::SelectingProcess;
                     }
                     KeyCode::Char('j') | KeyCode::Up => {
@@ -233,3 +257,4 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
         }
     }
 }
+

@@ -8,7 +8,8 @@ use super::components::{
     keybind_lowbar::keybind_lowbar,
     process_select::process_select,
     exit::exit,
-    search_settings::search_settings
+    search_settings::search_settings,
+    addr_bounds::addr_bounds
 };
 
 pub fn ui(frame: &mut Frame, app: &mut App) {
@@ -47,6 +48,7 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),
+            Constraint::Length(3),
             Constraint::Min(3),
             Constraint::Length(1),
         ])
@@ -60,6 +62,14 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
         ])
         .split(search_settings_chunks[0]);
 
+    let addr_bounds_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(50),
+            Constraint::Percentage(50),
+        ])
+        .split(search_settings_chunks[1]);
+
     let mvb = Block::bordered()
         .title(format!(" Found: {} ", app.mem_view_list.list.len()))
         .title_alignment(ratatui::layout::Alignment::Center)
@@ -70,6 +80,7 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
 
 
     search_settings(search_settings_chunks[0], frame, &input_bar_chunks, app);
+    addr_bounds(search_settings_chunks[1], frame, &addr_bounds_chunks, app);
 
 
     let key_notes_footer =
@@ -83,11 +94,19 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
     frame.render_widget(key_notes_footer, footer_chunks[1]);
 
     match app.input_mode {
-        InputMode::Editing => frame.set_cursor_position(Position::new(
+        InputMode::EditingQuery => frame.set_cursor_position(Position::new(
             // Draw the cursor at the current position in the input field.
             input_bar_chunks[0].x + app.query.0 as u16 + 1,
             // Move one line down, from the border to the input line
             input_bar_chunks[0].y + 1,
+        )),
+        InputMode::EditingLowerBound => frame.set_cursor_position(Position::new(
+            addr_bounds_chunks[0].x + app.bounds.0.0 as u16 + 1,
+            addr_bounds_chunks[0].y + 1,
+        )),
+        InputMode::EditingUpperBound => frame.set_cursor_position(Position::new(
+            addr_bounds_chunks[1].x + app.bounds.1.0 as u16 + 1,
+            addr_bounds_chunks[1].y + 1,
         )),
         InputMode::Normal => {}
     }

@@ -27,9 +27,8 @@ pub fn mem_view_window(area: Rect, frame: &mut Frame, chunks: Rc<[Rect]>, app: &
     let title = Line::from(title_lines).bg(Color::from_u32(0x00151414));
     frame.render_widget(title, chunks[0]);
 
-    let query = &app.query;
-    let processes: Vec<(String, String)> = vec![]; //get_mem_from_query(query.to_string()); only needs to run on submit, TODO
-    let processes_styled = processes.clone().into_iter().map(|p| {
+    let results: &Vec<(String, String)> = &app.query_results;
+    let results_styled = results.clone().into_iter().map(|p| {
         let line_width: usize = p.0.len() + p.1.to_string().len();
         let space_count = area.width as usize - line_width;
         let spaces: String = iter::repeat(' ').take(space_count - 3).collect::<String>();
@@ -42,16 +41,16 @@ pub fn mem_view_window(area: Rect, frame: &mut Frame, chunks: Rc<[Rect]>, app: &
             pid.into(),
 
         ];
-        if processes.iter().position(|q| p.1 == q.1).unwrap() % 2 == 0 { Line::from(process_lines).bg(Color::from_u32(0x00363636)) }
+        if results.iter().position(|q| p.1 == q.1).unwrap() % 2 == 0 { Line::from(process_lines).bg(Color::from_u32(0x00363636)) }
         else { Line::from(process_lines).bg(Color::from_u32(0x00252525)) }
     
     }).collect::<Vec<Line<'_>>>();
-    if processes_styled.len() == 0 {
+    if results_styled.len() == 0 {
         let empty = Line::from("No Results Available").centered().bg(Color::from_u32(0x00252525));
         frame.render_widget(empty, chunks[1]);
     }
     else {
-    let list = List::new(processes_styled)
+    let list = List::new(results_styled)
         .direction(ListDirection::TopToBottom)
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
         .highlight_symbol("❚").bg(Color::from_u32(0x00151414))
