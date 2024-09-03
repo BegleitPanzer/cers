@@ -40,6 +40,8 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
 
     match app.current_screen {
         CurrentScreen::Exiting => {
+            let outer_block = Block::bordered().title("Exit CERS").title_alignment(ratatui::layout::Alignment::Center).bg(Color::from_u32(0x00121111));
+            let outer_area = centered_rect(40, 40, frame.area());
             let area = centered_rect(30, 15, frame.area());
             let exit_chunks = Layout::default()
                 .direction(Direction::Vertical)
@@ -48,10 +50,12 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
                     Constraint::Length(1),
                 ])
                 .split(area);
-                
+            frame.render_widget(outer_block, outer_area);
             exit(frame, exit_chunks);
         }
         CurrentScreen::SelectingProcess => {
+            let outer_block = Block::bordered().title("Process Selection").title_alignment(ratatui::layout::Alignment::Center).bg(Color::from_u32(0x00121111));
+            let outer_area = centered_rect(62, 64, frame.area());
             let area = centered_rect(60, 60, frame.area());
             let popup_chunks = Layout::default()
                 .direction(Direction::Vertical)
@@ -61,7 +65,7 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
                     Constraint::Length(1),
                 ])
                 .split(area);
-                
+            frame.render_widget(outer_block, outer_area);
             process_select(area, frame, popup_chunks, &mut app.list_state);
             }
         _ => {

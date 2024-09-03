@@ -10,6 +10,7 @@ pub fn get_process_list() -> Vec<(String, u32)> {
         .unwrap()
         .into_iter()
         .filter_map(|pid| Process::open(pid).ok())
+        .filter(|p| p.name().is_ok()) // stops the error "Only part of a ReadProcessMemory or WriteProcessMemory request was completed."
         .map(|p| (p.name().unwrap(), p.pid))
         .collect::<Vec<(String, u32)>>();
     for proc in proclist {
