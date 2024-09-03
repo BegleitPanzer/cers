@@ -1,7 +1,10 @@
 
 
 use std::{io, time::Duration, error::Error};
-use crate::backend::components::get_process_list::get_process_list;
+use crate::backend::components::{
+    get_process_list::get_process_list,
+    get_mem_from_query::get_mem_from_query
+};
 
 use super::backend::process::process::Process;
 use super::rendering::ui;
@@ -15,7 +18,7 @@ use ratatui::crossterm::terminal::{enable_raw_mode, EnterAlternateScreen};
 use ratatui::crossterm::event::DisableMouseCapture;
 use ratatui::crossterm::terminal::{disable_raw_mode, LeaveAlternateScreen};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub enum CurrentScreen {
     #[default]
     Main,
@@ -24,7 +27,7 @@ pub enum CurrentScreen {
 }
 
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub enum InputMode {
     #[default]
     Normal,
@@ -72,7 +75,7 @@ pub struct App {
     pub current_screen: CurrentScreen,
     pub proc_list: VList, // i really wish i didnt have to put this here lmfao
     pub mem_view_list: VList,
-    pub query: String,
+    pub query: (i32, String), // i32 is the index of the character, necessary for cursor positioning
     pub input_mode: InputMode,
     pub scan_type: ScanTypes,
     pub exit: bool,
@@ -85,7 +88,7 @@ impl App {
             current_screen: CurrentScreen::Main,
             proc_list: VList::new(),
             mem_view_list: VList::new(),
-            query: String::new(),
+            query: (0, String::new()),
             input_mode: InputMode::Normal,
             scan_type: ScanTypes::Exact,
             exit: false
@@ -99,18 +102,14 @@ impl App {
         todo!()
     }
 
-    fn handle_key_press(&mut self, key: KeyEvent) {
-        todo!();
+    fn run_query(&mut self) {
+        todo!()
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
         let timeout = Duration::from_secs_f64(1.0 / 50.0);
         if !event::poll(timeout)? {
             return Ok(());
-        }
-        match event::read()? {
-            Event::Key(key) if key.kind == KeyEventKind::Press => self.handle_key_press(key),
-            _ => {}
         }
         Ok(())
     }
@@ -150,12 +149,47 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                 // Skip events that are not KeyEventKind::Press
                 continue;
             }
+            // todo: put key events into their own module, it's too cluttered in here
+            match app.input_mode {
+                InputMode::Normal => match key.code {
+                    KeyCode::Char('s') => {
+                        if app.current_screen != CurrentScreen::Main {
+                            app.current_screen = CurrentScreen::Main;
+                        }
+                        app.input_mode = InputMode::Editing;
+                    }
+                    KeyCode::Char('t') => {
+                        continue;
+                    }
+                    _ => {}
+                },
+                InputMode::Editing if key.kind == KeyEventKind::Press => match key.code {
+                    KeyCode::Enter => {
+                        app.input_mode = InputMode::Normal;
+                        get_mem_from_query(app.query.1.clone())
+                    },
+                    KeyCode::Char(to_insert) => {
+                        app.query = (app.query.0 + 1, format!("{}{}", app.query.1, to_insert));
+                    },
+                    KeyCode::Backspace => {
+                        // saturating sub for overflow error prevention
+                        app.query = ((app.query.0 - 1).clamp(0, std::i32::MAX), app.query.1[..app.query.1.len().saturating_sub(1)].to_string());
+                    },
+                    KeyCode::Esc => app.input_mode = InputMode::Normal,
+                    _ => {}
+                },
+                InputMode::Editing => {}
+            }
+
+
             match app.current_screen {
                 CurrentScreen::Main => match key.code {
                     KeyCode::Char('q') => {
+                        if app.input_mode == InputMode::Editing { continue; } // editing should ALWAYS take input priority
                         app.current_screen = CurrentScreen::Exiting;
                     }
                     KeyCode::Char('p') => {
+                        if app.input_mode == InputMode::Editing { continue; }
                         app.current_screen = CurrentScreen::SelectingProcess;
                     }
                     KeyCode::Char('j') | KeyCode::Up => {

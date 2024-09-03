@@ -5,7 +5,7 @@ use ratatui::{
     text::{Line, Span},
 };
 
-use crate::ui::ui::App;
+use crate::ui::main::App;
 
 pub fn titlebar(app: &App) -> Line<'static> {
     let process: Span<'_> = {

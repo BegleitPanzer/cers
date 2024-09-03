@@ -1,8 +1,8 @@
 use ratatui::{
-    buffer::Buffer, layout::{Constraint, Direction, Layout, Rect}, style::{Color, Style, Stylize}, text::{Line, Span, Text}, widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Widget, Wrap}, Frame
+    buffer::Buffer, layout::{Constraint, Direction, Layout, Position, Rect}, style::{Color, Style, Stylize}, text::{Line, Span, Text}, widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Widget, Wrap}, Frame
 };
 
-use super::{components::mem_view_window::mem_view_window, ui::{App, CurrentScreen, InputMode}};
+use super::{components::mem_view_window::mem_view_window, main::{App, CurrentScreen, InputMode}};
 use super::components::{
     titlebar::titlebar, 
     keybind_lowbar::keybind_lowbar,
@@ -69,7 +69,7 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
     mem_view_window(mem_view_chunks[0], frame, mem_view_chunks, app);
 
 
-    search_settings(search_settings_chunks[0], frame, input_bar_chunks, app);
+    search_settings(search_settings_chunks[0], frame, &input_bar_chunks, app);
 
 
     let key_notes_footer =
@@ -81,6 +81,16 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
         .split(chunks[2]);
 
     frame.render_widget(key_notes_footer, footer_chunks[1]);
+
+    match app.input_mode {
+        InputMode::Editing => frame.set_cursor_position(Position::new(
+            // Draw the cursor at the current position in the input field.
+            input_bar_chunks[0].x + app.query.0 as u16 + 1,
+            // Move one line down, from the border to the input line
+            input_bar_chunks[0].y + 1,
+        )),
+        InputMode::Normal => {}
+    }
 
     match app.current_screen {
         CurrentScreen::Exiting => {

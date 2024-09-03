@@ -4,7 +4,7 @@ use ratatui::{
     layout::{Layout, Rect}, style::{Color, Modifier, Style, Stylize}, text::{Line, Span, Text}, widgets::{Block, BorderType, Borders, List, ListDirection, ListState, Paragraph}, Frame
 };
 
-use crate::{backend::components::get_mem_from_query::get_mem_from_query, ui::ui::App};
+use crate::{backend::components::get_mem_from_query::get_mem_from_query, ui::main::App};
 
 use super::super::backend::components;
 
@@ -28,7 +28,7 @@ pub fn mem_view_window(area: Rect, frame: &mut Frame, chunks: Rc<[Rect]>, app: &
     frame.render_widget(title, chunks[0]);
 
     let query = &app.query;
-    let processes = get_mem_from_query(query.to_string());
+    let processes: Vec<(String, String)> = vec![]; //get_mem_from_query(query.to_string()); only needs to run on submit, TODO
     let processes_styled = processes.clone().into_iter().map(|p| {
         let line_width: usize = p.0.len() + p.1.to_string().len();
         let space_count = area.width as usize - line_width;

@@ -4,7 +4,7 @@ use ratatui::{
     layout::{Layout, Rect}, style::{Color, Modifier, Style, Stylize}, text::{Line, Span}, widgets::{List, ListDirection, ListState, Paragraph}, Frame
 };
 
-use crate::ui::ui::App;
+use crate::ui::main::App;
 
 use super::super::backend::components;
 

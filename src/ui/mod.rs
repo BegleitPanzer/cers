@@ -1,4 +1,4 @@
-pub mod ui;
+pub mod main;
 pub mod rendering;
 mod components;
 mod utils;
