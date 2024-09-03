@@ -19,7 +19,7 @@ pub fn mem_view_window(area: Rect, frame: &mut Frame, chunks: Rc<[Rect]>, app: &
 
     let spaces: String = iter::repeat(' ').take(space_count - 5).collect::<String>();
     let title_lines: Vec<Span<'_>> = vec![
-        "    ".into(),
+        "  ".into(),
         process.into(),
         spaces.into(),
         process_id.into(),
@@ -32,7 +32,7 @@ pub fn mem_view_window(area: Rect, frame: &mut Frame, chunks: Rc<[Rect]>, app: &
     let processes_styled = processes.clone().into_iter().map(|p| {
         let line_width: usize = p.0.len() + p.1.to_string().len();
         let space_count = area.width as usize - line_width;
-        let spaces: String = iter::repeat(' ').take(space_count - 6).collect::<String>();
+        let spaces: String = iter::repeat(' ').take(space_count - 3).collect::<String>();
         let pn = p.0;
         let pid = p.1.to_string();
         let process_lines: Vec<Span<'_>> = vec![
@@ -54,7 +54,7 @@ pub fn mem_view_window(area: Rect, frame: &mut Frame, chunks: Rc<[Rect]>, app: &
     let list = List::new(processes_styled)
         .direction(ListDirection::TopToBottom)
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
-        .highlight_symbol(" >> ").bg(Color::from_u32(0x00151414))
+        .highlight_symbol("❚").bg(Color::from_u32(0x00151414))
         .repeat_highlight_symbol(false);
     app.mem_view_list.list = list.clone();
     frame.render_stateful_widget(list, chunks[1], &mut app.mem_view_list.state);

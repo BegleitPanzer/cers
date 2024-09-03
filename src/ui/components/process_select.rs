@@ -17,9 +17,9 @@ pub fn process_select(area: Rect, frame: &mut Frame, chunks: Rc<[Rect]>, app: &m
     let line_width: usize = process.len() + process_id.len();
     let space_count = area.width as usize - line_width;
 
-    let spaces: String = iter::repeat(' ').take(space_count - 5).collect::<String>();
+    let spaces: String = iter::repeat(' ').take(space_count - 2).collect::<String>();
     let title_lines: Vec<Span<'_>> = vec![
-        "    ".into(),
+        " ".into(),
         process.into(),
         spaces.into(),
         process_id.into(),
@@ -31,7 +31,7 @@ pub fn process_select(area: Rect, frame: &mut Frame, chunks: Rc<[Rect]>, app: &m
     let processes_styled = processes.clone().into_iter().map(|p| {
         let line_width: usize = p.0.len() + p.1.to_string().len();
         let space_count = area.width as usize - line_width;
-        let spaces: String = iter::repeat(' ').take(space_count - 6).collect::<String>();
+        let spaces: String = iter::repeat(' ').take(space_count - 3).collect::<String>();
         let pn = p.0;
         let pid = p.1.to_string();
         let process_lines: Vec<Span<'_>> = vec![
@@ -48,7 +48,7 @@ pub fn process_select(area: Rect, frame: &mut Frame, chunks: Rc<[Rect]>, app: &m
     let list = List::new(processes_styled)
         .direction(ListDirection::TopToBottom)
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
-        .highlight_symbol(" >> ").bg(Color::from_u32(0x00121111))
+        .highlight_symbol("❚").bg(Color::from_u32(0x00121111))
         .repeat_highlight_symbol(false);
     app.proc_list.list = list.clone();
     frame.render_stateful_widget(list, chunks[1], &mut app.proc_list.state);

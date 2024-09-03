@@ -2,12 +2,13 @@ use ratatui::{
     buffer::Buffer, layout::{Constraint, Direction, Layout, Rect}, style::{Color, Style, Stylize}, text::{Line, Span, Text}, widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Widget, Wrap}, Frame
 };
 
-use super::{components::mem_view_window::mem_view_window, ui::{App, CurrentScreen, CurrentlyEditing}};
+use super::{components::mem_view_window::mem_view_window, ui::{App, CurrentScreen, InputMode}};
 use super::components::{
     titlebar::titlebar, 
     keybind_lowbar::keybind_lowbar,
     process_select::process_select,
-    exit::exit
+    exit::exit,
+    search_settings::search_settings
 };
 
 pub fn ui(frame: &mut Frame, app: &mut App) {
@@ -42,6 +43,23 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
         .horizontal_margin(1)
         .split(main_body[0]);
 
+    let search_settings_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Min(3),
+            Constraint::Length(1),
+        ])
+        .split(main_body[1]);
+
+    let input_bar_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(75),
+            Constraint::Percentage(25),
+        ])
+        .split(search_settings_chunks[0]);
+
     let mvb = Block::bordered()
         .title(format!(" Found: {} ", app.mem_view_list.list.len()))
         .title_alignment(ratatui::layout::Alignment::Center)
@@ -49,6 +67,9 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
     let mvba = Rect { x: main_body[0].x, y: main_body[0].y, width: main_body[0].width, height: main_body[0].height };
     frame.render_widget(mvb, mvba);
     mem_view_window(mem_view_chunks[0], frame, mem_view_chunks, app);
+
+
+    search_settings(search_settings_chunks[0], frame, input_bar_chunks, app);
 
 
     let key_notes_footer =
@@ -80,7 +101,7 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
         CurrentScreen::SelectingProcess => {
             
             let outer_block = Block::bordered().title(" Process Selection ").title_alignment(ratatui::layout::Alignment::Center).bg(Color::from_u32(0x00121111));
-            let outer_area = centered_rect(62, 64, frame.area());
+            let outer_area = centered_rect(62, 70, frame.area());
             let area = centered_rect(60, 60, frame.area());
             frame.render_widget(Clear, outer_area); // clears the area for this box so that the border doesn't show through
             let popup_chunks = Layout::default()

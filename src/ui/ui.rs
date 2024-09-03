@@ -23,9 +23,30 @@ pub enum CurrentScreen {
     Exiting,
 }
 
-pub enum CurrentlyEditing {
-    Key,
-    Value,
+
+#[derive(Debug, Default)]
+pub enum InputMode {
+    #[default]
+    Normal,
+    Editing,
+}
+
+#[derive(Debug, Default)]
+pub enum ScanTypes {
+    #[default]
+    Exact,
+    Range,
+    Unknown,
+}
+
+impl ScanTypes {
+    pub fn as_str(&self) -> &str {
+        match self {
+            ScanTypes::Exact => "Exact",
+            ScanTypes::Range => "Range",
+            ScanTypes::Unknown => "Unknown",
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -52,6 +73,8 @@ pub struct App {
     pub proc_list: VList, // i really wish i didnt have to put this here lmfao
     pub mem_view_list: VList,
     pub query: String,
+    pub input_mode: InputMode,
+    pub scan_type: ScanTypes,
     pub exit: bool,
 }
 
@@ -63,6 +86,8 @@ impl App {
             proc_list: VList::new(),
             mem_view_list: VList::new(),
             query: String::new(),
+            input_mode: InputMode::Normal,
+            scan_type: ScanTypes::Exact,
             exit: false
         };
         app.proc_list.state.select(Some(0)); // set a default value so the list renders properly
