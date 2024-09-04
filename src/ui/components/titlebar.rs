@@ -5,13 +5,11 @@ use ratatui::{
     text::{Line, Span},
 };
 
-use crate::ui::main::App;
+use crate::backend::process::process::Process;
 
-pub fn titlebar(app: &App) -> Line<'static> {
+pub fn titlebar(open_process: i32) -> Line<'static> {
     let process: Span<'_> = {
-        if let Some(x) = &app.open_process {
-            x.name().unwrap().light_green()
-        }
+        if open_process != 0 { Process::open(open_process as u32).unwrap().name().unwrap().light_green() }
         else { String::from("No Process Selected!").light_red() }
     };
     let mut title_version_info = vec![

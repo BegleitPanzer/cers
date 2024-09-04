@@ -1,17 +1,16 @@
-use std::{iter, rc::Rc};
+use std::rc::Rc;
 
 use ratatui::{
-    layout::{Layout, Rect}, style::{Color, Modifier, Style, Stylize}, text::{Line, Span, Text}, widgets::{Block, BorderType, Borders, List, ListDirection, ListState, Paragraph}, Frame
+    layout::Rect, style::{Color, Style, Stylize}, widgets::{Block, Paragraph}, Frame
 };
 
-use crate::{backend::components::get_mem_from_query::get_mem_from_query, ui::main::{App, InputMode}};
+use crate::ui::main::InputMode;
 
-use super::super::backend::components;
 
-pub fn addr_bounds(area: Rect, frame: &mut Frame, chunks: &Rc<[Rect]>, app: &mut App) {
+pub fn addr_bounds(frame: &mut Frame, chunks: &Rc<[Rect]>, bounds: ((i32, String), (i32, String)), input_mode: InputMode) {
     
-    let input = Paragraph::new(app.bounds.0.1.as_str())
-            .style(match app.input_mode {
+    let input = Paragraph::new(bounds.0.1.as_str())
+            .style(match input_mode {
                 InputMode::EditingLowerBound => Style::default().fg(Color::Yellow),
                 _ => Style::default(),
             })
@@ -20,8 +19,8 @@ pub fn addr_bounds(area: Rect, frame: &mut Frame, chunks: &Rc<[Rect]>, app: &mut
 
     frame.render_widget(input, chunks[0]);
 
-    let input = Paragraph::new(app.bounds.1.1.as_str())
-            .style(match app.input_mode {
+    let input = Paragraph::new(bounds.1.1.as_str())
+            .style(match input_mode {
                 InputMode::EditingUpperBound => Style::default().fg(Color::Yellow),
                 _ => Style::default(),
             })

@@ -4,11 +4,11 @@ use ratatui::{
     layout::{Layout, Rect}, style::{Color, Modifier, Style, Stylize}, text::{Line, Span, Text}, widgets::{Block, BorderType, Borders, List, ListDirection, ListState, Paragraph}, Frame
 };
 
-use crate::ui::main::App;
+use crate::ui::main::{AMApp, App};
 
 use super::super::backend::components;
 
-pub fn process_select(area: Rect, frame: &mut Frame, chunks: Rc<[Rect]>, app: &mut App) {
+pub fn process_select(area: Rect, frame: &mut Frame, chunks: Rc<[Rect]>, app: AMApp) {
     
     let process = String::from("Process Name");
     let process_id = String::from("Process ID");
@@ -50,8 +50,8 @@ pub fn process_select(area: Rect, frame: &mut Frame, chunks: Rc<[Rect]>, app: &m
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
         .highlight_symbol("❚").bg(Color::from_u32(0x00121111))
         .repeat_highlight_symbol(false);
-    app.proc_list.list = list.clone();
-    frame.render_stateful_widget(list, chunks[1], &mut app.proc_list.state);
+    app.modify_proc_list("set", Some(list.clone()));
+    frame.render_stateful_widget(list, chunks[1], &mut app.app.lock().unwrap().proc_list.state);
 
 
     let lines: Vec<Span<'_>> = vec![
