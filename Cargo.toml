@@ -4,8 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+color-eyre = "0.6.3"
 crossterm = "0.28.1"
 dotenv = "0.15.0"
+fragile = "2.0.0"
 futures = "0.3.30"
 hex = "0.4.3"
 ratatui = "0.28.1"

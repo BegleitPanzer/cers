@@ -14,39 +14,11 @@ mod backend;
 async fn main() {
     let app = App::new();
 
-    // spawn the thread for terminal rendering
-    tokio::spawn({let app = app.clone(); async move {
-        let _ = enable_raw_mode();
+    color_eyre::install();
+    let mut terminal = ratatui::init();
+    let app_result = ui::main::run_app(&mut terminal, app.clone()).await;
+    ratatui::restore();
 
-        let mut stderr = io::stderr(); // This is a special case. Normally using stdout is fine
-        let _ = execute!(stderr, EnterAlternateScreen, EnableMouseCapture);
-        let backend = CrosstermBackend::new(stderr);
-        let mut terminal = Terminal::new(backend).unwrap();
-
-        let res = ui::main::run_app(&mut terminal, app);
-         
-        if let Err(e) = res.await {
-            let _ = disable_raw_mode();
-            let _ = execute!(
-                terminal.backend_mut(),
-                LeaveAlternateScreen,
-                DisableMouseCapture
-            );
-            let _ = terminal.show_cursor();
-            panic!("An error occurred while running the application");
-        }
-        else {
-            let _ = disable_raw_mode();
-            let _ = execute!(
-                terminal.backend_mut(),
-                LeaveAlternateScreen,
-                DisableMouseCapture
-            );
-            let _ = terminal.show_cursor();
-            exit(0);
-        };
-
-      }});
       // spawn the thread for data reception over threads
       tokio::spawn({let app = app.clone(); async move {
         while let Some(msg) = app.app.lock().await.rx.recv().await {

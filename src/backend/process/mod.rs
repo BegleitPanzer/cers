@@ -2,34 +2,32 @@ pub mod process {
 
     use winapi::ctypes::c_void;
     use std::io;
+    use std::io::Error;
     use std::mem;
     use std::mem::MaybeUninit;
     use std::ptr::NonNull;
     use winapi::shared::minwindef::HMODULE;
     use winapi::shared::minwindef::{DWORD, FALSE};
     use winapi::um::winnt;
-
-    #[derive(Debug)]
-    pub struct WrappedCVoid(NonNull<c_void>);
-    unsafe impl Send for WrappedCVoid {}
+    use fragile::Fragile;
 
     #[derive(Debug)]
     pub struct Process {
         pub pid: u32,
-        pub handle: WrappedCVoid,
+        pub handle: Fragile<NonNull<c_void>>,
     }
 
     impl Process {
-        pub fn open(pid: u32) -> io::Result<Self> {
-            let handle = NonNull::new(unsafe {
+        pub fn open(pid: u32) -> io::Result<Self>  {
+            NonNull::new(unsafe {
                 winapi::um::processthreadsapi::OpenProcess(
                     winnt::PROCESS_QUERY_INFORMATION | winnt::PROCESS_VM_READ,
                     FALSE,
                     pid,
                 )
             })
-            .ok_or_else(|| io::Error::last_os_error())?;
-            Ok(Self { pid, handle: WrappedCVoid(handle) })
+            .map(|handle| Self { pid, handle: Fragile::new(handle) })
+            .ok_or_else(|| Error::last_os_error())
             
         }
         pub fn name(&self) -> io::Result<String> {
@@ -38,7 +36,7 @@ pub mod process {
             // SAFETY: the pointer is valid and the size is correct.
             if unsafe {
                 winapi::um::psapi::EnumProcessModules(
-                    self.handle.0.as_ptr(),
+                    self.handle.get().as_ptr(),
                     module.as_mut_ptr(),
                     mem::size_of::<HMODULE>() as u32,
                     &mut size,
@@ -54,7 +52,7 @@ pub mod process {
             // SAFETY: the handle, module and buffer are all valid.
             let length = unsafe {
                 winapi::um::psapi::GetModuleBaseNameA(
-                    self.handle.0.as_ptr(),
+                    self.handle.get().as_ptr(),
                     module,
                     buffer.as_mut_ptr().cast(),
                     buffer.capacity() as u32,
@@ -78,7 +76,7 @@ pub mod process {
                 // SAFETY: the info structure points to valid memory.
                 let written = unsafe {
                     winapi::um::memoryapi::VirtualQueryEx(
-                        self.handle.0.as_ptr(),
+                        self.handle.get().as_ptr(),
                         base as *const _,
                         info.as_mut_ptr(),
                         mem::size_of::<winapi::um::winnt::MEMORY_BASIC_INFORMATION>(),
@@ -101,7 +99,7 @@ pub mod process {
             // SAFETY: the buffer points to valid memory, and the buffer size is correctly set.
             if unsafe {
                 winapi::um::memoryapi::ReadProcessMemory(
-                    self.handle.0.as_ptr(),
+                    self.handle.get().as_ptr(),
                     addr as *const _,
                     buffer.as_mut_ptr().cast(),
                     buffer.capacity(),
@@ -124,7 +122,7 @@ pub mod process {
             // SAFETY: the buffer points to valid memory.
             if unsafe {
                 winapi::um::memoryapi::ReadProcessMemory(
-                    self.handle.0.as_ptr(),
+                    self.handle.get().as_ptr(),
                     addr as *const _,
                     buffer.as_mut_ptr().cast(),
                     mem::size_of::<u32>(),
@@ -142,7 +140,7 @@ pub mod process {
 
     impl Drop for Process {
         fn drop(&mut self) {
-            unsafe { winapi::um::handleapi::CloseHandle(self.handle.0.as_mut()) };
+            unsafe { winapi::um::handleapi::CloseHandle(self.handle.get().to_owned().as_mut()) };
         }
     }
 

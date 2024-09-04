@@ -6,7 +6,6 @@ use ratatui::{
 
 use crate::ui::main::App;
 
-use super::super::backend::components;
 
 pub fn exit(frame: &mut Frame, chunks: Rc<[Rect]>) {
 

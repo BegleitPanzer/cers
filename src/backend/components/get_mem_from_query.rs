@@ -8,7 +8,6 @@ struct WrappedMBI(winnt::MEMORY_BASIC_INFORMATION);
 unsafe impl Send for WrappedMBI {}
 
 pub async fn get_mem_from_query( upper_bound: usize, lower_bound: usize, app: AMApp ) {
-    panic!();
     let Ok(proc) = Process::open(app.get_process().await as u32)
     else { return; };
     let proc = proc;
