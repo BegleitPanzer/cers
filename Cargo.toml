@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 color-eyre = "0.6.3"
+crossbeam-channel = "0.5.13"
 crossterm = "0.28.1"
 dotenv = "0.15.0"
 fragile = "2.0.0"

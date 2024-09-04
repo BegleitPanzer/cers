@@ -1,4 +1,6 @@
 
+use std::iter::successors;
+
 use winapi::um::winnt;
 
 use crate::{backend::process::process::Process, ui::main::{AMApp, App, Data}};
@@ -7,11 +9,21 @@ use crate::{backend::process::process::Process, ui::main::{AMApp, App, Data}};
 struct WrappedMBI(winnt::MEMORY_BASIC_INFORMATION);
 unsafe impl Send for WrappedMBI {}
 
+#[derive(Debug)]
+pub enum QueryTypes {
+    Bytes2,
+    Bytes4,
+    Bytes8,
+    Float,
+    Double,
+    String
+}
+
 pub async fn get_mem_from_query( upper_bound: usize, lower_bound: usize, app: AMApp ) {
     let Ok(proc) = Process::open(app.get_process().await as u32)
     else { return; };
     let proc = proc;
-    app.modify_progress_msg(format!("lower_bound: {:#X}, upper_bound: {:#X}", lower_bound, upper_bound)).await;
+    app.modify_progress_msg(format!("Scanning...")).await;
     // filter memory regions by upper and lower bounds
     let mem = proc
         .memory_regions().
@@ -23,19 +35,41 @@ pub async fn get_mem_from_query( upper_bound: usize, lower_bound: usize, app: AM
     
     let regions: Vec<WrappedMBI> = mem.map(|p| WrappedMBI(p)).collect::<Vec<_>>();
 
-    let query = app.get_query().await; // don't want to lock this a million times
-    
-    for region in regions.clone().into_iter() {
-        app.modify_query_progress(regions.clone().into_iter().position(|p| p.0.BaseAddress == region.0.BaseAddress).unwrap() as f64 / regions.len() as f64).await;
-        let Ok(memory) = proc.read_memory(region.0.BaseAddress as _, region.0.RegionSize)
-        else { continue; };
-        for (offset, window) in memory.windows(4).enumerate() {
-            let value = proc.value_at(region.0.BaseAddress as usize + offset).unwrap();
-            let value = String::from_utf16(value.to_le_bytes().iter().map(|b| *b as u16).collect::<Vec<u16>>().as_ref()).unwrap();
-            if value != query.1 { continue; }
-            let addr = format!("{:#X}", region.0.BaseAddress as usize + offset);
+    let query = app.get_query().await.1; // don't want to lock this a million times
+    // discern the type of the query
+    let query_type: QueryTypes = {
+        if query.parse::<u16>().is_ok() { QueryTypes::Bytes2 }
+        else if query.parse::<u32>().is_ok() { QueryTypes::Bytes4 }
+        else if query.parse::<u64>().is_ok() { QueryTypes::Bytes8 }
+        else if query.parse::<f32>().is_ok() { QueryTypes::Float }
+        else if query.parse::<f64>().is_ok() { QueryTypes::Double }
+        else { QueryTypes::String }
+    };
 
-            app.app.lock().await.query_results.push((addr, value));
+    app.modify_progress_msg(format!("Identified query as type {:#?}.", query_type)).await;
+    
+    match query_type {
+        QueryTypes::Bytes2 | QueryTypes::Bytes4 | QueryTypes::Bytes8  => {
+            for region in regions.clone().into_iter() {
+                let query = query.parse::<u32>().unwrap();
+                let query_size = successors(Some(query), |&q| (q >= 10).then(|| query / 10)).count();
+                app.modify_query_progress(regions.clone().into_iter().position(|p| p.0.BaseAddress == region.0.BaseAddress).unwrap() as f64 / regions.len() as f64).await;
+                let Ok(memory) = proc.read_memory(region.0.BaseAddress as _, region.0.RegionSize)
+                else { continue; };
+                for (offset, window) in memory.windows(query_size).enumerate().step_by(4) {
+                    let Ok(value) = proc.value_at(region.0.BaseAddress as usize + offset)
+                    else { continue; };
+                    if value != query as u32 { continue; }
+                    let addr = format!("{:#X}", region.0.BaseAddress as usize + offset);
+                    app.modify_progress_msg(format!("Found value at address {:#X}.", region.0.BaseAddress as usize + offset)).await;
+                    app.app.lock().await.query_results.push((addr, value.to_string()));
+                }
+            }
         }
+        _ => {app.modify_progress_msg(format!("Could not parse type.")).await;}
     }
+
+    app.modify_query_progress(0.00).await;
+    app.modify_progress_msg(format!("Query complete.")).await;
+    
 }

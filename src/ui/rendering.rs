@@ -1,5 +1,5 @@
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Position, Rect}, style::{Color, Modifier, Style, Stylize}, symbols, text::{Line, Span}, widgets::{Block, Clear, LineGauge}, Frame
+    layout::{Constraint, Direction, Layout, Position, Rect}, style::{Color, Modifier, Style, Stylize}, symbols, text::{Line, Span}, widgets::{Block, Clear, Gauge, LineGauge, ListState}, Frame
 };
 
 use super::{components::mem_view_window::mem_view_window, main::{AMApp, CurrentScreen, InputMode}};
@@ -9,7 +9,8 @@ use super::components::{
     process_select::process_select,
     exit::exit,
     search_settings::search_settings,
-    addr_bounds::addr_bounds
+    addr_bounds::addr_bounds,
+    output_log::output_log
 };
 
 pub async fn ui(frame: &mut Frame<'_>, app: AMApp) {
@@ -49,8 +50,8 @@ pub async fn ui(frame: &mut Frame<'_>, app: AMApp) {
         .constraints([
             Constraint::Length(3),
             Constraint::Length(3),
-            Constraint::Length(1),
-            Constraint::Length(1),
+            Constraint::Length(3),
+            Constraint::Min(3),
             Constraint::Min(3),
             Constraint::Length(1),
         ])
@@ -84,17 +85,21 @@ pub async fn ui(frame: &mut Frame<'_>, app: AMApp) {
     search_settings(frame, &input_bar_chunks, app.get_input_mode().await, app.get_query().await.1.as_str(), app.get_scan_type().await);
     addr_bounds( frame, &addr_bounds_chunks, app.get_bounds().await, app.get_input_mode().await);
 
-    let progress_bar = LineGauge::default()
-        .filled_style(
+    let progress_bar = Gauge::default()
+        .block(Block::bordered().title("Progress").bg(Color::from_u32(0x00151414)))
+        .gauge_style(
             Style::default()
-                .fg(Color::White)
-                .bg(Color::Black)
-                .add_modifier(Modifier::BOLD),
+                .fg(Color::LightGreen)
+                .bg(Color::from_u32(0x00151414))
+                .add_modifier(Modifier::ITALIC),
         )
-        .line_set(symbols::line::THICK)
         .ratio(app.get_query_progress().await);
+    
     frame.render_widget(progress_bar, search_settings_chunks[2]);
-    frame.render_widget(Line::from(Span::from(&app.get_progress_msg().await)), search_settings_chunks[3]);
+    let list = output_log(app.clone()).await;
+    let mut state = ListState::default();
+    state.select(Some(list.len().saturating_sub(1)));
+    frame.render_stateful_widget(list, search_settings_chunks[3], &mut state);
 
     let key_notes_footer =
        keybind_lowbar();

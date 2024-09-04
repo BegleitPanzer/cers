@@ -4,8 +4,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use std::io;
 use crate::backend::components::get_process_list::get_process_list;
-
-use tokio::sync::mpsc::{self, Receiver, Sender};
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use super::rendering::ui;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::prelude::Backend;
@@ -38,12 +37,15 @@ pub enum ScanTypes {
     Unknown,
 }
 
+#[derive(Debug)]
 pub enum DataType {
     ProgressMsg,
     QueryResults,
     QueryProgress,
     BeginMemoryScan,
 }
+
+#[derive(Debug)]
 pub struct Data {
     pub data_type: DataType,
     pub data: String
@@ -88,7 +90,7 @@ pub struct App {
     pub query_progress: f64,
     pub tx: Sender<Data>,
     pub rx: Receiver<Data>,
-    pub progress_msg : String,
+    pub progress_msg : Vec<String>,
     pub input_mode: InputMode,
     pub scan_type: ScanTypes,
 
@@ -127,7 +129,7 @@ impl AMApp {
     }
     pub async fn modify_progress_msg(&self, msg: String) {
         let mut app = self.app.lock().await;
-        app.progress_msg = msg;
+        app.progress_msg.push(msg);
     }
     pub async fn modify_input_mode(&self, mode: InputMode) {
         let mut app = self.app.lock().await;
@@ -203,7 +205,7 @@ impl AMApp {
         let app = self.app.lock().await;
         app.query_progress
     }
-    pub async fn get_progress_msg(&self) -> String {
+    pub async fn get_progress_msg(&self) -> Vec<String> {
         let app = self.app.lock().await;
         app.progress_msg.clone()
     }
@@ -232,7 +234,7 @@ impl AMApp {
 
 impl App {
     pub fn new() -> AMApp {
-        let (tx, rx): (Sender<Data>, Receiver<Data>) = mpsc::channel(100);
+        let (tx, rx): (Sender<Data>, Receiver<Data>) = crossbeam_channel::unbounded();
         let mut app = App {
             open_process: 0,
             current_screen: CurrentScreen::Main,
@@ -246,7 +248,7 @@ impl App {
             rx,
             scan_type: ScanTypes::Exact,
             query_progress: 0.0,
-            progress_msg: String::from("Query not started..."),
+            progress_msg: vec![],
         };
         app.proc_list.state.select(Some(0)); // set a default value so the list renders properly
         app.mem_view_list.state.select(Some(0));
@@ -266,6 +268,7 @@ pub async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: AMApp) -> io::
             });
         });
         
+        if !event::poll(std::time::Duration::from_millis(16))? { continue;}
         if let Event::Key(key) = event::read()? {
             if key.kind == event::KeyEventKind::Release {
                 // Skip events that are not KeyEventKind::Press
@@ -287,9 +290,9 @@ pub async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: AMApp) -> io::
                     }
                     KeyCode::Enter => {
                         app.modify_input_mode(InputMode::Normal).await;
-                        if let Err(x) = app.get_tx().await.send(Data { data_type: DataType::BeginMemoryScan, data: String::new() }).await
+                        if let Err(x) = app.get_tx().await.send(Data { data_type: DataType::BeginMemoryScan, data: String::new() })
                         { app.modify_progress_msg(format!("Error sending data: {}", x)).await; }
-                        else { app.modify_progress_msg(String::from("Beginning memory scan...")).await; }
+                        else {}
        
                     },
                     _ => {}
