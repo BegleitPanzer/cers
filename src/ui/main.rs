@@ -1,25 +1,16 @@
 
 
-use std::sync::{Mutex, Arc, mpsc::{self, Receiver, Sender}};
-use std::thread;
-use std::{io, time::Duration, error::Error};
-use crate::backend::{components::{
-    get_mem_from_query::get_mem_from_query, get_process_list::get_process_list
-}, process};
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use std::io;
+use crate::backend::components::get_process_list::get_process_list;
 
-use futures::{future, pin_mut, SinkExt, StreamExt};
-use super::backend::process::process::Process;
+use tokio::sync::mpsc::{self, Receiver, Sender};
 use super::rendering::ui;
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
-use ratatui::prelude::{Backend, CrosstermBackend};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use ratatui::prelude::Backend;
 use ratatui::widgets::{List, ListState};
-use ratatui::{Frame, Terminal};
-use ratatui::crossterm::event::EnableMouseCapture;
-use ratatui::crossterm::execute;
-use ratatui::crossterm::terminal::{enable_raw_mode, EnterAlternateScreen};
-use ratatui::crossterm::event::DisableMouseCapture;
-use ratatui::crossterm::terminal::{disable_raw_mode, LeaveAlternateScreen};
-use tokio::runtime::Handle;
+use ratatui::Terminal;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub enum CurrentScreen {
@@ -51,6 +42,7 @@ pub enum DataType {
     ProgressMsg,
     QueryResults,
     QueryProgress,
+    BeginMemoryScan,
 }
 pub struct Data {
     pub data_type: DataType,
@@ -109,54 +101,54 @@ pub struct AMApp {
 
 impl AMApp {
     //setters
-    pub fn modify_process(&self, process: i32) {
-        let mut app = self.app.lock().unwrap();
+    pub async fn modify_process(&self, process: i32) {
+        let mut app = self.app.lock().await;
         app.open_process = process;
     }
-    pub fn modify_current_screen(&self, screen: CurrentScreen) {
-        let mut app = self.app.lock().unwrap();
+    pub async fn modify_current_screen(&self, screen: CurrentScreen) {
+        let mut app = self.app.lock().await;
         app.current_screen = screen;
     }
-    pub fn modify_query(&self, query: (i32, String)) {
-        let mut app = self.app.lock().unwrap();
+    pub async fn modify_query(&self, query: (i32, String)) {
+        let mut app = self.app.lock().await;
         app.query = query;
     }
-    pub fn modify_bounds(&self, bounds: ((i32, String), (i32, String))) {
-        let mut app = self.app.lock().unwrap();
+    pub async fn modify_bounds(&self, bounds: ((i32, String), (i32, String))) {
+        let mut app = self.app.lock().await;
         app.bounds = bounds;
     }
-    pub fn modify_query_results(&self, results: Vec<(String, String)>) {
-        let mut app = self.app.lock().unwrap();
+    pub async fn modify_query_results(&self, results: Vec<(String, String)>) {
+        let mut app = self.app.lock().await;
         app.query_results = results;
     }
-    pub fn modify_query_progress(&self, progress: f64) {
-        let mut app = self.app.lock().unwrap();
+    pub async fn modify_query_progress(&self, progress: f64) {
+        let mut app = self.app.lock().await;
         app.query_progress = progress;
     }
-    pub fn modify_progress_msg(&self, msg: String) {
-        let mut app = self.app.lock().unwrap();
+    pub async fn modify_progress_msg(&self, msg: String) {
+        let mut app = self.app.lock().await;
         app.progress_msg = msg;
     }
-    pub fn modify_input_mode(&self, mode: InputMode) {
-        let mut app = self.app.lock().unwrap();
+    pub async fn modify_input_mode(&self, mode: InputMode) {
+        let mut app = self.app.lock().await;
         app.input_mode = mode;
     }
-    pub fn modify_scan_type(&self, scan_type: ScanTypes) {
-        let mut app = self.app.lock().unwrap();
+    pub async fn modify_scan_type(&self, scan_type: ScanTypes) {
+        let mut app = self.app.lock().await;
         app.scan_type = scan_type;
     }
-    pub fn modify_mem_view_list(&self, action: &str, list: Option<List<'static>>) {
+    pub async fn modify_mem_view_list(&self, action: &str, list: Option<List<'static>>) {
         match action {
             "prev" => {
-                let mut app = self.app.lock().unwrap();
+                let mut app = self.app.lock().await;
                 app.mem_view_list.state.select_previous();
             },
             "next" => {
-                let mut app = self.app.lock().unwrap();
+                let mut app = self.app.lock().await;
                 app.mem_view_list.state.select_next();
             },
             "set" => {
-                let mut app = self.app.lock().unwrap();
+                let mut app = self.app.lock().await;
                 app.mem_view_list.list = list.unwrap();
             },
             _ => {
@@ -165,18 +157,18 @@ impl AMApp {
         };
     }
 
-    pub fn modify_proc_list(&self, action: &str, list: Option<List<'static>>) {
+    pub async fn modify_proc_list(&self, action: &str, list: Option<List<'static>>) {
         match action {
             "prev" => {
-                let mut app = self.app.lock().unwrap();
+                let mut app = self.app.lock().await;
                 app.proc_list.state.select_previous();
             },
             "next" => {
-                let mut app = self.app.lock().unwrap();
+                let mut app = self.app.lock().await;
                 app.proc_list.state.select_next();
             },
             "set" => {
-                let mut app = self.app.lock().unwrap();
+                let mut app = self.app.lock().await;
                 app.proc_list.list = list.unwrap();
             },
             _ => {
@@ -187,52 +179,52 @@ impl AMApp {
 
     //getters
 
-    pub fn get_process(&self) -> i32 {
-        let app = self.app.lock().unwrap();
+    pub async fn get_process(&self) -> i32 {
+        let app = self.app.lock().await;
         app.open_process
     }
-    pub fn get_current_screen(&self) -> CurrentScreen {
-        let app = self.app.lock().unwrap();
+    pub async fn get_current_screen(&self) -> CurrentScreen {
+        let app = self.app.lock().await;
         app.current_screen.clone()
     }
-    pub fn get_query(&self) -> (i32, String) {
-        let app = self.app.lock().unwrap();
+    pub async fn get_query(&self) -> (i32, String) {
+        let app = self.app.lock().await;
         app.query.clone()
     }
-    pub fn get_bounds(&self) -> ((i32, String), (i32, String)) {
-        let app = self.app.lock().unwrap();
+    pub async fn get_bounds(&self) -> ((i32, String), (i32, String)) {
+        let app = self.app.lock().await;
         app.bounds.clone()
     }
-    pub fn get_query_results(&self) -> Vec<(String, String)> {
-        let app = self.app.lock().unwrap();
+    pub async fn get_query_results(&self) -> Vec<(String, String)> {
+        let app = self.app.lock().await;
         app.query_results.clone()
     }
-    pub fn get_query_progress(&self) -> f64 {
-        let app = self.app.lock().unwrap();
+    pub async fn get_query_progress(&self) -> f64 {
+        let app = self.app.lock().await;
         app.query_progress
     }
-    pub fn get_progress_msg(&self) -> String {
-        let app = self.app.lock().unwrap();
+    pub async fn get_progress_msg(&self) -> String {
+        let app = self.app.lock().await;
         app.progress_msg.clone()
     }
-    pub fn get_input_mode(&self) -> InputMode {
-        let app = self.app.lock().unwrap();
+    pub async fn get_input_mode(&self) -> InputMode {
+        let app = self.app.lock().await;
         app.input_mode.clone()
     }
-    pub fn get_scan_type(&self) -> ScanTypes {
-        let app = self.app.lock().unwrap();
+    pub async fn get_scan_type(&self) -> ScanTypes {
+        let app = self.app.lock().await;
         app.scan_type.clone()
     }
-    pub fn get_tx(&self) -> Sender<Data> {
-        let app = self.app.lock().unwrap();
+    pub async fn get_tx(&self) -> Sender<Data> {
+        let app = self.app.lock().await;
         app.tx.clone()
     }
-    pub fn get_mem_view_list(&self) -> VList {
-        let app = self.app.lock().unwrap();
+    pub async fn get_mem_view_list(&self) -> VList {
+        let app = self.app.lock().await;
         app.mem_view_list.clone()
     }
-    pub fn get_proc_list(&self) -> VList {
-        let app = self.app.lock().unwrap();
+    pub async fn get_proc_list(&self) -> VList {
+        let app = self.app.lock().await;
         app.proc_list.clone()
     }
 
@@ -240,7 +232,7 @@ impl AMApp {
 
 impl App {
     pub fn new() -> AMApp {
-        let (tx, rx): (Sender<Data>, Receiver<Data>) = mpsc::channel();
+        let (tx, rx): (Sender<Data>, Receiver<Data>) = mpsc::channel(100);
         let mut app = App {
             open_process: 0,
             current_screen: CurrentScreen::Main,
@@ -263,113 +255,78 @@ impl App {
 
 }
 
-pub fn main() -> Result<(), Box<dyn Error>> {
-
-    // setup terminal
-    enable_raw_mode()?;
-    let mut stderr = io::stderr(); // This is a special case. Normally using stdout is fine
-    execute!(stderr, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stderr);
-    let mut terminal = Terminal::new(backend)?;
-
-    // create app and run it
-    let app = App::new();
-    let res = run_app(&mut terminal, app);
-
-    
-    if let Ok(x) = res {
-
-    }
-
-
-    // restore terminal
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
-
-
-    Ok(())
-}
-
-
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: AMApp) -> io::Result<bool> {
+pub async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: AMApp) -> io::Result<bool> {
 
     
     loop {
-        terminal.draw(|f| ui(f, app.clone()))?;
-
+        let handle = tokio::runtime::Handle::current();
+        tokio::task::block_in_place(|| {
+            let x = terminal.draw(|f| {
+                handle.block_on(ui(f, app.clone()))
+            });
+        });
+        
         if let Event::Key(key) = event::read()? {
             if key.kind == event::KeyEventKind::Release {
                 // Skip events that are not KeyEventKind::Press
                 continue;
             }
             // todo: put key events into their own module, it's too cluttered in here
-            match app.get_input_mode() {
+            match app.get_input_mode().await {
                 InputMode::Normal => match key.code {
                     KeyCode::Char('s') => {
-                        if app.get_current_screen() != CurrentScreen::Main { continue };
-                        app.modify_input_mode(InputMode::EditingQuery)
+                        if app.get_current_screen().await != CurrentScreen::Main { continue };
+                        app.modify_input_mode(InputMode::EditingQuery).await
                     }
                     KeyCode::Char('t') => {
                         continue;
                     }
                     KeyCode::Char('b') => {
-                        if app.get_current_screen() != CurrentScreen::Main { continue };
-                        app.modify_input_mode(InputMode::EditingLowerBound);
+                        if app.get_current_screen().await != CurrentScreen::Main { continue };
+                        app.modify_input_mode(InputMode::EditingLowerBound).await;
                     }
                     KeyCode::Enter => {
-                        
-                        app.modify_input_mode(InputMode::Normal);
-                        let lower_bound = usize::from_str_radix(&app.get_bounds().0.1, 16).unwrap();
-                        let upper_bound = usize::from_str_radix(&app.get_bounds().1.1, 16).unwrap();
-                        let tapp = app.clone();
-                        // TODO: run this in a new thread somehow
-                        /*let handler = thread::spawn(move || {
-                            get_mem_from_query(upper_bound, lower_bound, tapp);
-                        });
-                        
-                        handler.join().unwrap();*/
-                        
+                        app.modify_input_mode(InputMode::Normal).await;
+                        if let Err(x) = app.get_tx().await.send(Data { data_type: DataType::BeginMemoryScan, data: String::new() }).await
+                        { app.modify_progress_msg(format!("Error sending data: {}", x)).await; }
+                        else { app.modify_progress_msg(String::from("Beginning memory scan...")).await; }
+       
                     },
                     _ => {}
                 },
                 InputMode::EditingQuery if key.kind == KeyEventKind::Press => match key.code {
                     KeyCode::Char(to_insert) => {
-                        app.modify_query((app.get_query().0 + 1, format!("{}{}", app.get_query().1, to_insert)));
+                        app.modify_query((app.get_query().await.0 + 1, format!("{}{}", app.get_query().await.1, to_insert))).await;
                     },
                     KeyCode::Backspace => {
                         // saturating sub for overflow error prevention
-                        app.modify_query(((app.get_query().0 - 1).clamp(0, std::i32::MAX), app.get_query().1[..app.get_query().1.len().saturating_sub(1)].to_string()));
+                        app.modify_query(((app.get_query().await.0 - 1).clamp(0, std::i32::MAX), app.get_query().await.1[..app.get_query().await.1.len().saturating_sub(1)].to_string())).await;
                     },
-                    KeyCode::Esc => app.modify_input_mode(InputMode::Normal),
+                    KeyCode::Esc => app.modify_input_mode(InputMode::Normal).await,
                     _ => {}
                 },
                 InputMode::EditingUpperBound | InputMode::EditingLowerBound if key.kind == KeyEventKind::Press => match key.code {
                     KeyCode::Esc => {
-                        app.modify_input_mode(InputMode::Normal);
+                        app.modify_input_mode(InputMode::Normal).await;
                     },
                     KeyCode::Char(to_insert) => {
-                        if let InputMode::EditingLowerBound = app.get_input_mode(){
-                            app.modify_bounds(((app.get_bounds().0.0 + 1, format!("{}{}", app.get_bounds().0.1, to_insert)), app.get_bounds().1));
+                        if let InputMode::EditingLowerBound = app.get_input_mode().await {
+                            app.modify_bounds(((app.get_bounds().await.0.0 + 1, format!("{}{}", app.get_bounds().await.0.1, to_insert)), app.get_bounds().await.1)).await;
                         } else {
-                            app.modify_bounds((app.get_bounds().0, (app.get_bounds().1.0 + 1, format!("{}{}", app.get_bounds().1.1, to_insert))));
+                            app.modify_bounds((app.get_bounds().await.0, (app.get_bounds().await.1.0 + 1, format!("{}{}", app.get_bounds().await.1.1, to_insert)))).await;
                         }
                     },
                     KeyCode::Backspace => {
-                        if let InputMode::EditingLowerBound = app.get_input_mode() {
-                            app.modify_bounds((((app.get_bounds().0.0 - 1).clamp(0, std::i32::MAX), app.get_bounds().0.1[..app.get_bounds().0.1.len().saturating_sub(1)].to_string()), app.get_bounds().1));
+                        if let InputMode::EditingLowerBound = app.get_input_mode().await {
+                            app.modify_bounds((((app.get_bounds().await.0.0 - 1).clamp(0, std::i32::MAX), app.get_bounds().await.0.1[..app.get_bounds().await.0.1.len().saturating_sub(1)].to_string()), app.get_bounds().await.1)).await;
                         } else {
-                            app.modify_bounds((app.get_bounds().0,((app.get_bounds().1.0 - 1).clamp(0, std::i32::MAX), app.get_bounds().1.1[..app.get_bounds().1.1.len().saturating_sub(1)].to_string())));
+                            app.modify_bounds((app.get_bounds().await.0,((app.get_bounds().await.1.0 - 1).clamp(0, std::i32::MAX), app.get_bounds().await.1.1[..app.get_bounds().await.1.1.len().saturating_sub(1)].to_string()))).await;
                         }
                     },
                     KeyCode::Tab => { 
-                        match app.get_input_mode() {
-                        InputMode::EditingUpperBound => app.modify_input_mode(InputMode::EditingLowerBound),
-                        InputMode::EditingLowerBound => app.modify_input_mode(InputMode::EditingUpperBound),
+                        match app.get_input_mode().await {
+                        InputMode::EditingUpperBound => app.modify_input_mode(InputMode::EditingLowerBound).await,
+                        InputMode::EditingLowerBound => app.modify_input_mode(InputMode::EditingUpperBound).await,
                         _ => {}
                         }
                     },
@@ -378,27 +335,27 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: AMApp) -> io::Result<boo
                 InputMode::EditingQuery | InputMode::EditingLowerBound | InputMode::EditingUpperBound => {}
             }
 
-            match app.get_current_screen() {
+            match app.get_current_screen().await {
                 CurrentScreen::Main => match key.code {
                     KeyCode::Char('q') => {
-                        if app.get_input_mode() == InputMode::EditingQuery 
-                        || app.get_input_mode() == InputMode::EditingLowerBound
-                        || app.get_input_mode() == InputMode::EditingUpperBound 
+                        if app.get_input_mode().await == InputMode::EditingQuery 
+                        || app.get_input_mode().await == InputMode::EditingLowerBound
+                        || app.get_input_mode().await == InputMode::EditingUpperBound 
                         { continue; } // editing should ALWAYS take input priority
-                        app.modify_current_screen(CurrentScreen::Exiting);
+                        app.modify_current_screen(CurrentScreen::Exiting).await;
                     }
                     KeyCode::Char('p') => {
-                        if app.get_input_mode() == InputMode::EditingQuery 
-                        || app.get_input_mode() == InputMode::EditingLowerBound
-                        || app.get_input_mode() == InputMode::EditingUpperBound 
+                        if app.get_input_mode().await == InputMode::EditingQuery 
+                        || app.get_input_mode().await == InputMode::EditingLowerBound
+                        || app.get_input_mode().await == InputMode::EditingUpperBound 
                         { continue; }
-                        app.modify_current_screen(CurrentScreen::SelectingProcess);
+                        app.modify_current_screen(CurrentScreen::SelectingProcess).await;
                     }
                     KeyCode::Char('j') | KeyCode::Up => {
-                        app.modify_mem_view_list("prev", None);
+                        app.modify_mem_view_list("prev", None).await;
                     }
                     KeyCode::Char('k') | KeyCode::Down => {
-                        app.modify_mem_view_list("next", None);
+                        app.modify_mem_view_list("next", None).await;
                     }
                     _ => {}
                 },
@@ -407,30 +364,29 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: AMApp) -> io::Result<boo
                         return Ok(true);
                     }
                     KeyCode::Char('c') => {
-                        app.modify_current_screen(CurrentScreen::Main);
+                        app.modify_current_screen(CurrentScreen::Main).await;
                     }
                     _ => {}
                 }
                 CurrentScreen::SelectingProcess => match key.code {
                     KeyCode::Char('q') => {
-                        app.modify_current_screen(CurrentScreen::Main);
+                        app.modify_current_screen(CurrentScreen::Main).await;
                     }
                     KeyCode::Char('j') | KeyCode::Up => {
-                        app.modify_proc_list("prev", None)
+                        app.modify_proc_list("prev", None).await;
                     }
                     KeyCode::Char('k') | KeyCode::Down => {
-                        app.modify_proc_list("next", None)
+                        app.modify_proc_list("next", None).await;
                     }
                     KeyCode::Char('c') => {
                         let processes = get_process_list();
-                        let Some(idx) = app.get_proc_list().state.selected()
+                        let Some(idx) = app.get_proc_list().await.state.selected()
                         else { continue; };
-                        app.modify_process(processes[idx].1 as i32);
-                        app.modify_current_screen(CurrentScreen::Main);
+                        app.modify_process(processes[idx].1 as i32).await;
+                        app.modify_current_screen(CurrentScreen::Main).await;
                     }
                     _ => {}
                 }
-                _ => {}
             }
         }
     }

@@ -1,14 +1,12 @@
 use std::{iter, rc::Rc};
 
 use ratatui::{
-    layout::{Layout, Rect}, style::{Color, Modifier, Style, Stylize}, text::{Line, Span, Text}, widgets::{Block, BorderType, Borders, List, ListDirection, ListState, Paragraph}, Frame
+    layout::Rect, style::{Color, Modifier, Style, Stylize}, text::{Line, Span}, widgets::{List, ListDirection}, Frame
 };
 
-use crate::{backend::components::get_mem_from_query::get_mem_from_query, ui::main::{AMApp, App}};
+use crate::ui::main::AMApp;
 
-use super::super::backend::components;
-
-pub fn mem_view_window(area: Rect, frame: &mut Frame, chunks: Rc<[Rect]>, app: AMApp) {
+pub async fn mem_view_window(area: Rect, frame: &mut Frame<'_>, chunks: Rc<[Rect]>, app: AMApp) {
     
     let process = String::from("Address");
     let process_id = String::from("Value");
@@ -27,7 +25,7 @@ pub fn mem_view_window(area: Rect, frame: &mut Frame, chunks: Rc<[Rect]>, app: A
     let title = Line::from(title_lines).bg(Color::from_u32(0x00151414));
     frame.render_widget(title, chunks[0]);
 
-    let results: &Vec<(String, String)> = &app.get_query_results();
+    let results: &Vec<(String, String)> = &app.get_query_results().await;
     let results_styled = results.clone().into_iter().map(|p| {
         let line_width: usize = p.0.len() + p.1.to_string().len();
         let space_count = area.width as usize - line_width;
@@ -55,8 +53,8 @@ pub fn mem_view_window(area: Rect, frame: &mut Frame, chunks: Rc<[Rect]>, app: A
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
         .highlight_symbol("❚").bg(Color::from_u32(0x00151414))
         .repeat_highlight_symbol(false);
-    app.modify_mem_view_list("set", Some(list.clone()));
-    frame.render_stateful_widget(list, chunks[1], &mut app.app.lock().unwrap().mem_view_list.state); // oh god oh fuck
+    app.modify_mem_view_list("set", Some(list.clone())).await;
+    frame.render_stateful_widget(list, chunks[1], &mut app.app.lock().await.mem_view_list.state); // oh god oh fuck
     }
 
 
