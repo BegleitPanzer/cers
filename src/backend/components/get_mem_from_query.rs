@@ -20,10 +20,13 @@ pub enum QueryTypes {
 }
 
 pub async fn get_mem_from_query( upper_bound: usize, lower_bound: usize, app: AMApp ) {
+    if app.get_querying().await { return; }
     let Ok(proc) = Process::open(app.get_process().await as u32)
     else { return; };
     let proc = proc;
     app.modify_progress_msg(format!("Scanning...")).await;
+    app.modify_mem_view_list("reset", None).await;
+    app.modify_querying(true).await;
     // filter memory regions by upper and lower bounds
     let mem = proc
         .memory_regions().
@@ -50,13 +53,13 @@ pub async fn get_mem_from_query( upper_bound: usize, lower_bound: usize, app: AM
     
     match query_type {
         QueryTypes::Bytes2 | QueryTypes::Bytes4 | QueryTypes::Bytes8  => {
+            app.modify_progress_msg(format!("Querying {} regions for {}...", regions.len(), query)).await;
             for region in regions.clone().into_iter() {
                 let query = query.parse::<u32>().unwrap();
-                let query_size = successors(Some(query), |&q| (q >= 10).then(|| query / 10)).count();
                 app.modify_query_progress(regions.clone().into_iter().position(|p| p.0.BaseAddress == region.0.BaseAddress).unwrap() as f64 / regions.len() as f64).await;
                 let Ok(memory) = proc.read_memory(region.0.BaseAddress as _, region.0.RegionSize)
                 else { continue; };
-                for (offset, window) in memory.windows(query_size).enumerate().step_by(4) {
+                for (offset, window) in memory.windows((query.ilog10() + 1) as usize).enumerate().step_by((query.ilog10() + 1) as usize) {
                     let Ok(value) = proc.value_at(region.0.BaseAddress as usize + offset)
                     else { continue; };
                     if value != query as u32 { continue; }
@@ -71,5 +74,6 @@ pub async fn get_mem_from_query( upper_bound: usize, lower_bound: usize, app: AM
 
     app.modify_query_progress(0.00).await;
     app.modify_progress_msg(format!("Query complete.")).await;
+    app.modify_querying(false).await;
     
 }

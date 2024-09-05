@@ -34,12 +34,12 @@ pub async fn mem_view_window(area: Rect, frame: &mut Frame<'_>, chunks: Rc<[Rect
         let pid = p.1.to_string();
         let process_lines: Vec<Span<'_>> = vec![
             " ".into(),
-            pn.into(),
+            pn.clone().into(),
             spaces.into(),
-            pid.into(),
+            pid.clone().into(),
 
         ];
-        if results.iter().position(|q| p.1 == q.1).unwrap() % 2 == 0 { Line::from(process_lines).bg(Color::from_u32(0x00363636)) }
+        if results.iter().position(|q| *q == (pn.clone(), pid.clone())).unwrap() % 2 == 0 { Line::from(process_lines).bg(Color::from_u32(0x00363636)) }
         else { Line::from(process_lines).bg(Color::from_u32(0x00252525)) }
     
     }).collect::<Vec<Line<'_>>>();

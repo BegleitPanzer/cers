@@ -1,5 +1,6 @@
 
 
+use std::process::exit;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use std::io;
@@ -88,6 +89,7 @@ pub struct App {
     pub bounds: ((i32, String), (i32, String)), // upper and lower bounds for memory scanning, respectively
     pub query_results: Vec<(String, String)>,
     pub query_progress: f64,
+    pub querying: bool,
     pub tx: Sender<Data>,
     pub rx: Receiver<Data>,
     pub progress_msg : Vec<String>,
@@ -153,10 +155,18 @@ impl AMApp {
                 let mut app = self.app.lock().await;
                 app.mem_view_list.list = list.unwrap();
             },
+            "reset" => {
+                let mut app = self.app.lock().await;
+                app.mem_view_list = VList::new();
+            }
             _ => {
                 
             }
         };
+    }
+    pub async fn modify_querying(&self, querying: bool) {
+        let mut app = self.app.lock().await;
+        app.querying = querying;
     }
 
     pub async fn modify_proc_list(&self, action: &str, list: Option<List<'static>>) {
@@ -229,6 +239,10 @@ impl AMApp {
         let app = self.app.lock().await;
         app.proc_list.clone()
     }
+    pub async fn get_querying(&self) -> bool {
+        let app = self.app.lock().await;
+        app.querying
+    }
 
 }
 
@@ -244,6 +258,7 @@ impl App {
             bounds: ((18, String::from("0000000000000000")), (16, String::from("00007fffffffffff"))),
             input_mode: InputMode::Normal,
             query_results: Vec::new(),
+            querying: false,
             tx,
             rx,
             scan_type: ScanTypes::Exact,
@@ -289,7 +304,8 @@ pub async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: AMApp) -> io::
                         app.modify_input_mode(InputMode::EditingLowerBound).await;
                     }
                     KeyCode::Enter => {
-                        app.modify_input_mode(InputMode::Normal).await;
+                        if app.get_process().await == 0 { app.modify_progress_msg("Please select a process.".to_string()).await; continue; }
+                        if app.get_query().await.1.is_empty() { app.modify_progress_msg("Please enter a query.".to_string()).await; continue; }
                         if let Err(x) = app.get_tx().await.send(Data { data_type: DataType::BeginMemoryScan, data: String::new() })
                         { app.modify_progress_msg(format!("Error sending data: {}", x)).await; }
                         else {}
@@ -365,6 +381,7 @@ pub async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: AMApp) -> io::
                 CurrentScreen::Exiting => match key.code {
                     KeyCode::Char('y') | KeyCode::Char('q') => {
                         return Ok(true);
+                        exit(0);
                     }
                     KeyCode::Char('c') => {
                         app.modify_current_screen(CurrentScreen::Main).await;

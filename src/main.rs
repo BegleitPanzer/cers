@@ -42,5 +42,8 @@ async fn main() {
     let mut terminal = ratatui::init();
     let app_result = ui::main::run_app(&mut terminal, app.clone()).await;
     ratatui::restore();
+    if let Ok(app) = app_result {
+        exit(0);
+    }
 
 }

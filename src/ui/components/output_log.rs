@@ -1,11 +1,12 @@
-use std::{iter, rc::Rc};
-
 use ratatui::{
-    layout::Rect, style::{Color, Modifier, Style, Stylize}, text::{Line, Span}, widgets::{Block, List, ListDirection, ListState}, Frame
+    style::{Color, Modifier, Style, Stylize}, text::Span, widgets::{Block, List, ListDirection}
 };
 
 use crate::ui::main::AMApp;
 
+///
+/// Gets the progress message list from the App state, styles it, and returns the list.
+/// 
 pub async fn output_log(app: AMApp) -> List<'static> {
     
     let results = &app.get_progress_msg().await;
@@ -17,7 +18,7 @@ pub async fn output_log(app: AMApp) -> List<'static> {
     let list = List::new(results_styled)
         .direction(ListDirection::TopToBottom)
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
-        .highlight_symbol("❚").bg(Color::from_u32(0x00151414))
+        .highlight_symbol("").bg(Color::from_u32(0x00151414))
         .repeat_highlight_symbol(false)
         .block(Block::bordered().title("Output Log"));
     list

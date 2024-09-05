@@ -51,9 +51,9 @@ pub async fn ui(frame: &mut Frame<'_>, app: AMApp) {
             Constraint::Length(3),
             Constraint::Length(3),
             Constraint::Length(3),
+            Constraint::Min(1),
+            Constraint::Length(3),
             Constraint::Min(3),
-            Constraint::Min(3),
-            Constraint::Length(1),
         ])
         .split(main_body[1]);
 
@@ -95,11 +95,11 @@ pub async fn ui(frame: &mut Frame<'_>, app: AMApp) {
         )
         .ratio(app.get_query_progress().await);
     
-    frame.render_widget(progress_bar, search_settings_chunks[2]);
+    frame.render_widget(progress_bar, search_settings_chunks[4]);
     let list = output_log(app.clone()).await;
     let mut state = ListState::default();
     state.select(Some(list.len().saturating_sub(1)));
-    frame.render_stateful_widget(list, search_settings_chunks[3], &mut state);
+    frame.render_stateful_widget(list, search_settings_chunks[5], &mut state);
 
     let key_notes_footer =
        keybind_lowbar();
