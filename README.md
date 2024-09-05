@@ -3,11 +3,11 @@ CERS is a TUI memory browser and editor, strongly inspired by Cheat Engine and w
 
 ### Roadmap:
 - [x] Integer Scanning
-- [] Float Scanning
-- [] String Scanning
-- [] More Scan Types
-- [] Better Scan Speed
-- [] Proper Settings Menu
+- [ ] Float Scanning
+- [ ] String Scanning
+- [ ] More Scan Types
+- [ ] Better Scan Speed
+- [ ] Proper Settings Menu
 
 more to come :)
 
