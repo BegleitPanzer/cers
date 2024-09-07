@@ -15,7 +15,7 @@ pub async fn mem_view_window(area: Rect, frame: &mut Frame<'_>, chunks: Rc<[Rect
     let line_width: usize = process.len() + process_id.len();
     let space_count = area.width as usize - line_width;
 
-    let spaces: String = iter::repeat(' ').take(space_count - 5).collect::<String>();
+    let spaces: String = iter::repeat(' ').take(space_count - 3).collect::<String>();
     let title_lines: Vec<Span<'_>> = vec![
         "  ".into(),
         process.into(),
