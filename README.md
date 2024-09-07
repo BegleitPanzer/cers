@@ -8,6 +8,8 @@ CERS is a TUI memory browser and editor, strongly inspired by Cheat Engine and w
 - [ ] More Scan Types
 - [x] Better Scan Speed
 - [ ] Better Scan Speed (2.0)
+- [ ] Search Bar in Process List
+- [ ] Support for Scan + Offset
 - [ ] Proper Settings Menu
 - more to come :)
 

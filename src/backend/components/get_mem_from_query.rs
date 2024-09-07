@@ -37,11 +37,22 @@ pub async fn get_mem_from_query( upper_bound: usize, lower_bound: usize, app: AM
     app.modify_mem_view_list("reset", None).await;
     app.modify_querying(true).await;
     // filter memory regions by upper and lower bounds
+
+    let mask = 
+      winnt::PAGE_READWRITE;
+      // | winnt::PAGE_WRITECOPY 
+      // | winnt::PAGE_EXECUTE;
+      
+
+
+    
+
+
     let mem = proc
         .memory_regions().
         into_iter().
         filter(|p| {
-            ((p.Protect & winnt::PAGE_READWRITE) != 0)
+            ((p.Protect & mask) != 0)
             && ((p.BaseAddress as usize) >= lower_bound && (p.BaseAddress as usize) <= upper_bound)
         });
     
@@ -63,8 +74,6 @@ pub async fn get_mem_from_query( upper_bound: usize, lower_bound: usize, app: AM
     let mut query_results: Vec<usize> = vec![];
    
     // this makes N tasks where N = the number of regions.
-    // Theoretically could be sped up even more by making tasks for each address in the region.
-    // I wonder what the limit is?
     let task_count = regions.len();
 
     let mut tasks_finished = 0;
@@ -74,7 +83,7 @@ pub async fn get_mem_from_query( upper_bound: usize, lower_bound: usize, app: AM
         out[i % task_count].push(d);
     }
     let mut futures = FuturesUnordered::new();
-    for (idx, region) in out.into_iter().enumerate() {
+    for  region in out.into_iter() {
         futures.push(spawn_mem_read_task(region, pid, query.clone(), query_type));
     }
     while let Some(result) = futures.next().await {
@@ -84,10 +93,11 @@ pub async fn get_mem_from_query( upper_bound: usize, lower_bound: usize, app: AM
         app.modify_progress_msg(format!("Task {}/{} finished", tasks_finished, task_count)).await;
     }
     app.modify_progress_msg(format!("Query complete.")).await;
+    app.modify_progress_msg(format!("Query took {} seconds.", start.elapsed().as_secs_f32())).await;
+    app.modify_progress_msg(format!("Found {} results.", query_results.len())).await;
     app.modify_query_progress(0.00).await;
     app.modify_query_results(query_results).await;
     app.modify_querying(false).await;
-    app.modify_progress_msg(format!("Query took {} seconds.", start.elapsed().as_secs_f32())).await;
     
 }
 
@@ -99,16 +109,40 @@ async fn spawn_mem_read_task(regions: Vec<WrappedMBI>, pid: u32, query: String, 
     let proc = Process::open(pid).unwrap();
     tokio::spawn({let query_results = query_results.clone(); async move {
         match qtype {
-            QueryTypes::Bytes2 | QueryTypes::Bytes4 | QueryTypes::Bytes8 => {
-                let query = query.parse::<u32>().unwrap();
+            QueryTypes::Bytes2 => {
+                let query = u16::to_ne_bytes(query.parse::<u16>().unwrap());
                 for region in regions.clone().into_iter() {
                     let Ok(memory) = proc.read_memory(region.0.BaseAddress as _, region.0.RegionSize)
                     else { continue };
-                    for (offset, _)  in memory.windows((query.ilog10() + 1) as usize).enumerate().into_iter().step_by((query.ilog10() + 1) as usize) {
-                        let addr = region.0.BaseAddress as usize + offset as usize;
-                        let Ok(value) = proc.value_at(addr)
-                        else { continue; };
-                        if value != query as u32 { continue; }
+                    for (offset, window)  in memory.windows(2).enumerate().into_iter().step_by(2) {
+                        let addr = region.0.BaseAddress as usize + offset as usize; 
+                        if window != query { continue; }
+                        //app.modify_progress_msg(format!("Found value at address {:#X}.",addr)).await;
+                        query_results.lock().await.push(addr);
+                    }
+                }
+            }
+            QueryTypes::Bytes4 => {
+                let query = u32::to_ne_bytes(query.parse::<u32>().unwrap());
+                for region in regions.clone().into_iter() {
+                    let Ok(memory) = proc.read_memory(region.0.BaseAddress as _, region.0.RegionSize)
+                    else { continue };
+                    for (offset, window)  in memory.windows(4).enumerate().into_iter().step_by(4) {
+                        let addr = region.0.BaseAddress as usize + offset as usize; 
+                        if window != query { continue; }
+                        //app.modify_progress_msg(format!("Found value at address {:#X}.",addr)).await;
+                        query_results.lock().await.push(addr);
+                    }
+                }
+            }
+            QueryTypes::Bytes8 => {
+                let query = u64::to_ne_bytes(query.parse::<u64>().unwrap());
+                for region in regions.clone().into_iter() {
+                    let Ok(memory) = proc.read_memory(region.0.BaseAddress as _, region.0.RegionSize)
+                    else { continue };
+                    for (offset, window)  in memory.windows(8).enumerate().into_iter().step_by(8) {
+                        let addr = region.0.BaseAddress as usize + offset as usize; 
+                        if window != query { continue; }
                         //app.modify_progress_msg(format!("Found value at address {:#X}.",addr)).await;
                         query_results.lock().await.push(addr);
                     }

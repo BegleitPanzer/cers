@@ -87,7 +87,7 @@ pub struct App {
     pub mem_view_list: VList,
     pub query: (i32, String), // i32 is the index of the character, necessary for cursor positioning
     pub bounds: ((i32, String), (i32, String)), // upper and lower bounds for memory scanning, respectively
-    pub query_results: Vec<(String, String)>,
+    pub query_results: Vec<String>,
     pub query_progress: f64,
     pub querying: bool,
     pub tx: Sender<Data>,
@@ -123,7 +123,7 @@ impl AMApp {
     }
     pub async fn modify_query_results(&self, results: Vec<usize>) {
         let mut app = self.app.lock().await;
-        app.query_results = results.iter().map(|p| (format!("{:x}", p), app.query.1.clone())).collect();
+        app.query_results = results.into_iter().map(|p| format!("{:#X}", p)).collect();
     }
     pub async fn modify_query_progress(&self, progress: f64) {
         let mut app = self.app.lock().await;
@@ -207,7 +207,7 @@ impl AMApp {
         let app = self.app.lock().await;
         app.bounds.clone()
     }
-    pub async fn get_query_results(&self) -> Vec<(String, String)> {
+    pub async fn get_query_results(&self) -> Vec<String> {
         let app = self.app.lock().await;
         app.query_results.clone()
     }
