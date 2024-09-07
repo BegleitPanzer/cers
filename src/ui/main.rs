@@ -123,8 +123,7 @@ impl AMApp {
     }
     pub async fn modify_query_results(&self, results: Vec<usize>) {
         let mut app = self.app.lock().await;
-        let query = self.get_query().await.1;
-        app.query_results = results.iter().map(|p| (format!("{:x}", p), query.clone())).collect();
+        app.query_results = results.iter().map(|p| (format!("{:x}", p), app.query.1.clone())).collect();
     }
     pub async fn modify_query_progress(&self, progress: f64) {
         let mut app = self.app.lock().await;
@@ -132,7 +131,7 @@ impl AMApp {
     }
     pub async fn modify_progress_msg(&self, msg: String) {
         let mut app = self.app.lock().await;
-        app.progress_msg.push(msg);
+        app.progress_msg.push(msg.clone());
     }
     pub async fn modify_input_mode(&self, mode: InputMode) {
         let mut app = self.app.lock().await;

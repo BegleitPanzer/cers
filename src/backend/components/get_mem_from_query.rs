@@ -4,6 +4,7 @@ use std::{iter::successors, sync::Arc};
 use futures::{stream::FuturesUnordered, StreamExt};
 use tokio::sync::Mutex;
 use winapi::um::winnt;
+use std::time::Instant;
 
 use crate::{backend::process::process::Process, ui::main::{AMApp, App, Data}};
 
@@ -25,7 +26,8 @@ pub enum QueryTypes {
 /// Scan's the selected processes memory for a specific value
 /// This needs to be HEAVILY optimized. Cheat Engine is lightning fast, this isn't.
 /// 
-pub async fn get_mem_from_query( upper_bound: usize, lower_bound: usize, app: AMApp ) {
+pub async fn get_mem_from_query( upper_bound: usize, lower_bound: usize, app: AMApp) {
+    let start = Instant::now();
     if app.get_querying().await { return; }
     let pid = app.get_process().await as u32;
     let Ok(proc) = Process::open(pid)
@@ -60,38 +62,39 @@ pub async fn get_mem_from_query( upper_bound: usize, lower_bound: usize, app: AM
     app.modify_progress_msg(format!("Querying {} regions for {}...", regions.len(), query)).await;
     let mut query_results: Vec<usize> = vec![];
    
-    let thread_count = {
-        if regions.len() < 100 { regions.len() }
-        else { 100 }
-    };
-    let mut threads_finished = 0;
-    // split up regions into equal parts based on thread count
-    let each_len = regions.len() / thread_count + if regions.len() % thread_count == 0 { 0 } else { 1 };
-    let mut out = vec![Vec::with_capacity(each_len); thread_count];
+    // this makes N tasks where N = the number of regions.
+    // Theoretically could be sped up even more by making tasks for each address in the region.
+    // I wonder what the limit is?
+    let task_count = regions.len();
+
+    let mut tasks_finished = 0;
+    let each_len = regions.len() / task_count + if regions.len() % task_count == 0 { 0 } else { 1 };
+    let mut out = vec![Vec::with_capacity(each_len); task_count];
     for (i, d) in regions.iter().copied().enumerate() {
-        out[i % thread_count].push(d);
+        out[i % task_count].push(d);
     }
-    let query_results: Arc<Mutex<Vec<usize>>> = Arc::new(Mutex::new(vec![]));
-    let mut threads = FuturesUnordered::new();
+    let mut futures = FuturesUnordered::new();
     for (idx, region) in out.into_iter().enumerate() {
-        threads.push(spawn_mem_read_thread(region, app.clone(), pid, query.clone(), query_type, idx));
+        futures.push(spawn_mem_read_task(region, pid, query.clone(), query_type));
     }
-    while let Some(result) = threads.next().await {
-        query_results.lock().await.extend(result);
-        threads_finished += 1;
-        app.modify_query_progress(threads_finished as f64 / thread_count as f64).await;
+    while let Some(result) = futures.next().await {
+        tasks_finished += 1;
+        query_results.extend(result);
+        app.modify_query_progress(tasks_finished as f64 / task_count as f64).await;
+        app.modify_progress_msg(format!("Task {}/{} finished", tasks_finished, task_count)).await;
     }
-    app.modify_query_progress(0.00).await;
     app.modify_progress_msg(format!("Query complete.")).await;
-    app.modify_query_results(query_results.lock().await.clone()).await;
+    app.modify_query_progress(0.00).await;
+    app.modify_query_results(query_results).await;
     app.modify_querying(false).await;
+    app.modify_progress_msg(format!("Query took {} seconds.", start.elapsed().as_secs_f32())).await;
     
 }
 
 ///
-/// Spawns a thread for reading a number of memory regions.
+/// Spawns a task for reading a number of memory regions.
 /// 
-async fn spawn_mem_read_thread(regions: Vec<WrappedMBI>, app: AMApp, pid: u32, query: String, qtype: QueryTypes, region_idx: usize) -> Vec<usize> {
+async fn spawn_mem_read_task(regions: Vec<WrappedMBI>, pid: u32, query: String, qtype: QueryTypes) -> Vec<usize> {
     let query_results: Arc<Mutex<Vec<usize>>> = Arc::new(Mutex::new(vec![]));
     let proc = Process::open(pid).unwrap();
     tokio::spawn({let query_results = query_results.clone(); async move {
@@ -144,6 +147,5 @@ async fn spawn_mem_read_thread(regions: Vec<WrappedMBI>, app: AMApp, pid: u32, q
         }
     }}).await.unwrap();
     let r = query_results.lock().await.clone();
-    app.modify_progress_msg(format!("Thread {} complete.", region_idx)).await;
     r
 }

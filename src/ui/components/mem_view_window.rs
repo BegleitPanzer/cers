@@ -48,7 +48,7 @@ pub async fn mem_view_window(area: Rect, frame: &mut Frame<'_>, chunks: Rc<[Rect
         frame.render_widget(empty, chunks[1]);
     }
     else {
-    let list = List::new(["1", "2"])
+    let list = List::new(results_styled)
         .direction(ListDirection::TopToBottom)
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
         .highlight_symbol("❚").bg(Color::from_u32(0x00151414))

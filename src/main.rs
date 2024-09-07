@@ -8,6 +8,7 @@ use crossterm::{
 };
 use futures::{executor::block_on, pin_mut};
 use ratatui::{prelude::CrosstermBackend, Terminal};
+use tokio::runtime::Handle;
 use ui::main::{App, DataType};
 
 mod backend;
@@ -17,9 +18,6 @@ mod ui;
 async fn main() {
     let app = App::new();
 
-    
-
-    // spawn the thread for data reception over threads
     tokio::spawn({
         let app = app.clone();
         let recv = app.app.lock().await.rx.clone();

@@ -51,7 +51,7 @@ pub async fn ui(frame: &mut Frame<'_>, app: AMApp) {
             Constraint::Length(3),
             Constraint::Length(3),
             Constraint::Length(3),
-            Constraint::Min(1),
+            Constraint::Min(3),
             Constraint::Length(3),
             Constraint::Min(3),
         ])
@@ -95,6 +95,7 @@ pub async fn ui(frame: &mut Frame<'_>, app: AMApp) {
         )
         .ratio(app.get_query_progress().await);
     
+
     frame.render_widget(progress_bar, search_settings_chunks[4]);
     let list = output_log(app.clone()).await;
     let mut state = ListState::default();
