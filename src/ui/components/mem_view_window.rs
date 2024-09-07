@@ -26,7 +26,7 @@ pub async fn mem_view_window(area: Rect, frame: &mut Frame<'_>, chunks: Rc<[Rect
     frame.render_widget(title, chunks[0]);
 
     let results: &Vec<String> = &app.get_query_results().await;
-    let results_styled = results.clone().into_iter().map(|p| {
+    let results_styled = results.clone()[0..{if results.len() > 500 { 500 } else { results.len() }}].into_iter().map(|p| {
         let line_width: usize = p.len() + query.len();
         let space_count = area.width as usize - line_width;
         let spaces: String = iter::repeat(' ').take(space_count - 3).collect::<String>();
@@ -39,7 +39,7 @@ pub async fn mem_view_window(area: Rect, frame: &mut Frame<'_>, chunks: Rc<[Rect
             val.clone().into(),
 
         ];
-        if results.iter().position(|q| *q == p).unwrap() % 2 == 0 { Line::from(process_lines).bg(Color::from_u32(0x00363636)) }
+        if results.iter().position(|q| q == p).unwrap() % 2 == 0 { Line::from(process_lines).bg(Color::from_u32(0x00363636)) }
         else { Line::from(process_lines).bg(Color::from_u32(0x00252525)) }
     
     }).collect::<Vec<Line<'_>>>();
