@@ -9,7 +9,7 @@ pub fn keybind_lowbar() -> Line<'static> {
         "  |  ".fg(Color::from_u32(0x00242222)),
         "[p]: Select Process".dark_gray(),
         "  |  ".fg(Color::from_u32(0x00242222)),
-        "[t]: Change Scan Type".dark_gray(),
+        "[e]: Edit Settings".dark_gray(),
         "  |  ".fg(Color::from_u32(0x00242222)),
         "[s]: Change Search Query".dark_gray(),
         "  |  ".fg(Color::from_u32(0x00242222)),

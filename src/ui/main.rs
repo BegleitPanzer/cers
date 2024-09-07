@@ -121,9 +121,10 @@ impl AMApp {
         let mut app = self.app.lock().await;
         app.bounds = bounds;
     }
-    pub async fn modify_query_results(&self, results: Vec<(String, String)>) {
+    pub async fn modify_query_results(&self, results: Vec<usize>) {
         let mut app = self.app.lock().await;
-        app.query_results = results;
+        let query = self.get_query().await.1;
+        app.query_results = results.iter().map(|p| (format!("{:x}", p), query.clone())).collect();
     }
     pub async fn modify_query_progress(&self, progress: f64) {
         let mut app = self.app.lock().await;
@@ -381,7 +382,6 @@ pub async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: AMApp) -> io::
                 CurrentScreen::Exiting => match key.code {
                     KeyCode::Char('y') | KeyCode::Char('q') => {
                         return Ok(true);
-                        exit(0);
                     }
                     KeyCode::Char('c') => {
                         app.modify_current_screen(CurrentScreen::Main).await;

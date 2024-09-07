@@ -9,11 +9,11 @@ pub mod process {
     use winapi::shared::minwindef::HMODULE;
     use winapi::shared::minwindef::{DWORD, FALSE};
     use winapi::um::winnt;
-    use fragile::Fragile;
 
     #[derive(Debug)]
     struct WrappedNonNull(NonNull<c_void>);
     unsafe impl Send for WrappedNonNull {}
+    unsafe impl Sync for WrappedNonNull {}
 
     #[derive(Debug)]
     pub struct Process {
