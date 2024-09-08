@@ -1,14 +1,6 @@
-use std::{io, process::exit, ptr::NonNull, thread};
-
+use std::process::exit;
 use backend::components::get_mem_from_query::get_mem_from_query;
-use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
-use futures::{executor::block_on, pin_mut};
-use ratatui::{prelude::CrosstermBackend, Terminal};
-use tokio::runtime::Handle;
+use ratatui;
 use ui::main::{App, DataType};
 
 mod backend;
@@ -31,18 +23,16 @@ async fn main() {
                         let upper_bound = usize::from_str_radix(&bounds.1 .1, 16).unwrap();
                         get_mem_from_query(upper_bound, lower_bound, app.clone()).await;
                     }
-                    _ => {}
                 }
             }
         }
     });
 
-    color_eyre::install();
+    color_eyre::install().unwrap();
     let mut terminal = ratatui::init();
     let app_result = ui::main::run_app(&mut terminal, app.clone()).await;
     ratatui::restore();
-    if let Ok(app) = app_result {
+    if let Ok(_) = app_result {
         exit(0);
     }
-
 }

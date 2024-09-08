@@ -74,7 +74,7 @@ pub async fn ui(frame: &mut Frame<'_>, app: AMApp) {
         .split(search_settings_chunks[1]);
 
     let mvb = Block::bordered()
-        .title(format!(" Found: {} ", app.get_mem_view_list().await.list.len()))
+        .title(format!(" Found: {} ", app.get_query_result_count().await))
         .title_alignment(ratatui::layout::Alignment::Center)
         .bg(Color::from_u32(0x00151414));
     let mvba = Rect { x: main_body[0].x, y: main_body[0].y, width: main_body[0].width, height: main_body[0].height };

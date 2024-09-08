@@ -1,13 +1,13 @@
 
 
-use std::process::exit;
+use std::ops::Range;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use std::io;
-use crate::backend::components::get_process_list::get_process_list;
-use crossbeam_channel::{unbounded, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender};
+use super::input;
 use super::rendering::ui;
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use crossterm::event::{self, Event};
 use ratatui::prelude::Backend;
 use ratatui::widgets::{List, ListState};
 use ratatui::Terminal;
@@ -40,9 +40,6 @@ pub enum ScanTypes {
 
 #[derive(Debug)]
 pub enum DataType {
-    ProgressMsg,
-    QueryResults,
-    QueryProgress,
     BeginMemoryScan,
 }
 
@@ -207,9 +204,14 @@ impl AMApp {
         let app = self.app.lock().await;
         app.bounds.clone()
     }
-    pub async fn get_query_results(&self) -> Vec<String> {
+    pub async fn get_query_results(&self, mut range: Range<usize>) -> Vec<String> {
         let app = self.app.lock().await;
-        app.query_results.clone()
+        range.end = range.end.clamp(0, app.query_results.len());
+        app.query_results.clone()[range].to_vec()
+    }
+    pub async fn get_query_result_count(&self) -> usize {
+        let app = self.app.lock().await;
+        app.query_results.len()
     }
     pub async fn get_query_progress(&self) -> f64 {
         let app = self.app.lock().await;
@@ -273,8 +275,6 @@ impl App {
 }
 
 pub async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: AMApp) -> io::Result<bool> {
-
-    
     loop {
         let handle = tokio::runtime::Handle::current();
         tokio::task::block_in_place(|| {
@@ -284,130 +284,12 @@ pub async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: AMApp) -> io::
         });
         
         if !event::poll(std::time::Duration::from_millis(16))? { continue;}
-        if let Event::Key(key) = event::read()? {
-            if key.kind == event::KeyEventKind::Release {
-                // Skip events that are not KeyEventKind::Press
-                continue;
-            }
-            // todo: put key events into their own module, it's too cluttered in here
-            match app.get_input_mode().await {
-                InputMode::Normal => match key.code {
-                    KeyCode::Char('s') => {
-                        if app.get_current_screen().await != CurrentScreen::Main { continue };
-                        app.modify_input_mode(InputMode::EditingQuery).await
-                    }
-                    KeyCode::Char('t') => {
-                        continue;
-                    }
-                    KeyCode::Char('b') => {
-                        if app.get_current_screen().await != CurrentScreen::Main { continue };
-                        app.modify_input_mode(InputMode::EditingLowerBound).await;
-                    }
-                    KeyCode::Enter => {
-                        if app.get_process().await == 0 { app.modify_progress_msg("Please select a process.".to_string()).await; continue; }
-                        if app.get_query().await.1.is_empty() { app.modify_progress_msg("Please enter a query.".to_string()).await; continue; }
-                        if let Err(x) = app.get_tx().await.send(Data { data_type: DataType::BeginMemoryScan, data: String::new() })
-                        { app.modify_progress_msg(format!("Error sending data: {}", x)).await; }
-                        else {}
-       
-                    },
-                    _ => {}
-                },
-                InputMode::EditingQuery if key.kind == KeyEventKind::Press => match key.code {
-                    KeyCode::Char(to_insert) => {
-                        app.modify_query((app.get_query().await.0 + 1, format!("{}{}", app.get_query().await.1, to_insert))).await;
-                    },
-                    KeyCode::Backspace => {
-                        // saturating sub for overflow error prevention
-                        app.modify_query(((app.get_query().await.0 - 1).clamp(0, std::i32::MAX), app.get_query().await.1[..app.get_query().await.1.len().saturating_sub(1)].to_string())).await;
-                    },
-                    KeyCode::Esc => app.modify_input_mode(InputMode::Normal).await,
-                    _ => {}
-                },
-                InputMode::EditingUpperBound | InputMode::EditingLowerBound if key.kind == KeyEventKind::Press => match key.code {
-                    KeyCode::Esc => {
-                        app.modify_input_mode(InputMode::Normal).await;
-                    },
-                    KeyCode::Char(to_insert) => {
-                        if let InputMode::EditingLowerBound = app.get_input_mode().await {
-                            app.modify_bounds(((app.get_bounds().await.0.0 + 1, format!("{}{}", app.get_bounds().await.0.1, to_insert)), app.get_bounds().await.1)).await;
-                        } else {
-                            app.modify_bounds((app.get_bounds().await.0, (app.get_bounds().await.1.0 + 1, format!("{}{}", app.get_bounds().await.1.1, to_insert)))).await;
-                        }
-                    },
-                    KeyCode::Backspace => {
-                        if let InputMode::EditingLowerBound = app.get_input_mode().await {
-                            app.modify_bounds((((app.get_bounds().await.0.0 - 1).clamp(0, std::i32::MAX), app.get_bounds().await.0.1[..app.get_bounds().await.0.1.len().saturating_sub(1)].to_string()), app.get_bounds().await.1)).await;
-                        } else {
-                            app.modify_bounds((app.get_bounds().await.0,((app.get_bounds().await.1.0 - 1).clamp(0, std::i32::MAX), app.get_bounds().await.1.1[..app.get_bounds().await.1.1.len().saturating_sub(1)].to_string()))).await;
-                        }
-                    },
-                    KeyCode::Tab => { 
-                        match app.get_input_mode().await {
-                        InputMode::EditingUpperBound => app.modify_input_mode(InputMode::EditingLowerBound).await,
-                        InputMode::EditingLowerBound => app.modify_input_mode(InputMode::EditingUpperBound).await,
-                        _ => {}
-                        }
-                    },
-                    _ => {}
-                },
-                InputMode::EditingQuery | InputMode::EditingLowerBound | InputMode::EditingUpperBound => {}
-            }
-
-            match app.get_current_screen().await {
-                CurrentScreen::Main => match key.code {
-                    KeyCode::Char('q') => {
-                        if app.get_input_mode().await == InputMode::EditingQuery 
-                        || app.get_input_mode().await == InputMode::EditingLowerBound
-                        || app.get_input_mode().await == InputMode::EditingUpperBound 
-                        { continue; } // editing should ALWAYS take input priority
-                        app.modify_current_screen(CurrentScreen::Exiting).await;
-                    }
-                    KeyCode::Char('p') => {
-                        if app.get_input_mode().await == InputMode::EditingQuery 
-                        || app.get_input_mode().await == InputMode::EditingLowerBound
-                        || app.get_input_mode().await == InputMode::EditingUpperBound 
-                        { continue; }
-                        app.modify_current_screen(CurrentScreen::SelectingProcess).await;
-                    }
-                    KeyCode::Char('j') | KeyCode::Up => {
-                        app.modify_mem_view_list("prev", None).await;
-                    }
-                    KeyCode::Char('k') | KeyCode::Down => {
-                        app.modify_mem_view_list("next", None).await;
-                    }
-                    _ => {}
-                },
-                CurrentScreen::Exiting => match key.code {
-                    KeyCode::Char('y') | KeyCode::Char('q') => {
-                        return Ok(true);
-                    }
-                    KeyCode::Char('c') => {
-                        app.modify_current_screen(CurrentScreen::Main).await;
-                    }
-                    _ => {}
-                }
-                CurrentScreen::SelectingProcess => match key.code {
-                    KeyCode::Char('q') => {
-                        app.modify_current_screen(CurrentScreen::Main).await;
-                    }
-                    KeyCode::Char('j') | KeyCode::Up => {
-                        app.modify_proc_list("prev", None).await;
-                    }
-                    KeyCode::Char('k') | KeyCode::Down => {
-                        app.modify_proc_list("next", None).await;
-                    }
-                    KeyCode::Char('c') => {
-                        let processes = get_process_list();
-                        let Some(idx) = app.get_proc_list().await.state.selected()
-                        else { continue; };
-                        app.modify_process(processes[idx].1 as i32).await;
-                        app.modify_current_screen(CurrentScreen::Main).await;
-                    }
-                    _ => {}
-                }
-            }
-        }
+        let Event::Key(key) = event::read()? else { continue };
+        if key.kind == event::KeyEventKind::Release { continue; }
+        
+        let res = input::handle_input(app.clone(), key).await;
+        if !res { continue; }
+        else { return Ok(true) }   
     }
 }
 
